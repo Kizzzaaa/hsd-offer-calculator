@@ -77,13 +77,13 @@
   .adjusted-offer{padding:8px;border-radius:8px;font-weight:700}
   .adjusted-green{background:var(--good)}
   .adjusted-red{background:var(--bad)}
-  .renovation-section{margin-top:14px;display:none}
+  .renovation-section{margin-top:14px}
   .renovation-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
   .renovation-options label{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer}
   .renovation-options input[type="checkbox"]{width:18px;height:18px;accent-color:var(--brand)}
   .sidebar{flex:1;display:flex;flex-direction:column;max-height:900px;position:sticky;top:20px;min-width:520px;transition:width .25s ease,max-width .25s ease}
   .sidebar.wide{min-width:960px;max-width:1200px;width:100%}
-  .sidebar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .sidebar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;position:relative}
   .sidebar-header h2{font-size:22px;color:var(--brand);margin:0}
   .export-btn{background:transparent;border:none;cursor:pointer;font-size:16px;color:var(--brand);opacity:0.8;transition:.2s;padding:6px;border-radius:8px}
   .export-btn:hover{opacity:1;transform:scale(1.06);background:var(--soft)}
@@ -113,7 +113,6 @@
   .overlay-actions{position:sticky;top:0;display:flex;gap:8px;justify-content:flex-end;margin-bottom:8px}
   #themeToggle{position:fixed;top:20px;right:20px;font-size:14px;width:36px;height:36px;border-radius:50%;display:flex;justify-content:center;align-items:center;background:var(--soft);border:1px solid var(--border);cursor:pointer;transition:.25s;z-index:3500}
   #themeToggle:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
-  /* PDF overlay iframe full */
   #pdfOverlayFrame{width:100%;height:80vh;border:none;border-radius:10px;background:#fff}
   .pdf-actions{display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px}
   .tiny-btn{padding:6px 8px;font-size:12px;border-radius:8px}
@@ -123,23 +122,34 @@
     .sidebar{min-width:unset}
     .sidebar.wide{min-width:unset;max-width:unset;width:100%}
   }
+
+  /* Sidebar logo */
+  .sidebar-brand { display:flex; align-items:center; gap:10px }
+  .sidebar-logo { height:28px; width:auto; display:block; }
+  .sidebar-header::after {
+    content:""; display:block; position:absolute; left:0; right:0; height:1px;
+    background:var(--border); bottom:-8px; opacity:.6;
+  }
+  @media (max-width: 600px){ .sidebar-logo { height:24px; } }
+  [data-theme="dark"] .sidebar-logo { /*filter: brightness(1.1);*/ }
 </style>
 </head>
 <body>
 <button id="themeToggle" aria-label="Toggle dark mode">🌙</button>
 <div class="flex-container">
+
   <!-- Calculator -->
   <div class="calculator">
     <h2>HSD Offer Calculator</h2>
 
-    <!-- Email/Password Auth (replaces magic link) -->
+    <!-- Email/Password Auth -->
     <div id="authBox" class="stack" style="margin:12px 0">
       <input type="email" id="authEmail" placeholder="Email">
       <input type="password" id="authPassword" placeholder="Password">
       <div class="button-group">
-        <button id="signupBtn" class="ghost">Create account</button>
-        <button id="signinBtn">Sign in</button>
-        <button id="logoutBtn" class="ghost">Sign out</button>
+        <button id="signupBtn" class="ghost" type="button">Create account</button>
+        <button id="signinBtn" type="button">Sign in</button>
+        <button id="logoutBtn" type="button" class="ghost">Sign out</button>
       </div>
       <small id="whoami" style="opacity:.8">Not signed in</small>
     </div>
@@ -160,7 +170,18 @@
           <option value="180">180 Days</option>
         </select>
       </div>
-      <div>
+    </div>
+
+    <!-- Renovations FIRST -->
+    <div class="renovation-section" id="renovationSection" aria-hidden="false">
+      <label>Include Renovation Costs?</label>
+      <div class="stack" role="radiogroup" aria-label="Include renovations">
+        <label><input type="radio" name="includeRenov" value="yes"> Yes</label>
+        <label><input type="radio" name="includeRenov" value="no" checked> No</label>
+      </div>
+
+      <!-- Property Type only appears if includeRenov = yes -->
+      <div id="propertyTypeGroup" style="display:none; margin-top:8px">
         <label for="propertyType">Property Type</label>
         <select id="propertyType" aria-label="Property type">
           <option value="">Select property type</option>
@@ -173,33 +194,29 @@
           <option value="3 bed bungalow">3 Bed Bungalow</option>
         </select>
       </div>
-    </div>
 
-    <div class="button-group">
-      <button id="calculateBtn">Calculate Offer</button>
-      <button id="clearBtn" class="secondary">Clear</button>
-    </div>
-
-    <div class="result-card" id="result" aria-live="polite"></div>
-
-    <div class="renovation-section" id="renovationSection" aria-hidden="true">
-      <label>Include Renovation Costs?</label>
-      <div class="stack" role="radiogroup" aria-label="Include renovations">
-        <label><input type="radio" name="includeRenov" value="yes"> Yes</label>
-        <label><input type="radio" name="includeRenov" value="no" checked> No</label>
-      </div>
       <div class="renovation-options" id="renovationOptions" style="display:none"></div>
     </div>
 
     <div class="button-group">
-      <button id="saveBtn">Save Calculation</button>
+      <button id="calculateBtn" type="button">Calculate Offer</button>
+      <button id="clearBtn" type="button" class="secondary">Clear</button>
+    </div>
+
+    <div class="result-card" id="result" aria-live="polite"></div>
+
+    <div class="button-group">
+      <button id="saveBtn" type="button">Save Calculation</button>
     </div>
   </div>
 
   <!-- Sidebar -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <h2>Templates & Saved Data</h2>
+      <div class="sidebar-brand">
+        <img src="/assets/hsd-logo.png" alt="House Sales Direct" class="sidebar-logo" />
+        <h2>Templates & Saved Data</h2>
+      </div>
       <button id="exportBtn" class="export-btn" title="Export Backup">💾</button>
     </div>
 
@@ -355,7 +372,6 @@
 
         <div id="valuationList" class="stack"></div>
       </div>
-
     </div>
   </div>
 </div>
@@ -383,12 +399,11 @@
   </div>
 </div>
 
-<!-- Supabase client + Backend (EMAIL/PASSWORD) -->
+<!-- Supabase client + Backend -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  // TODO: Fill with your Supabase project values
   const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs"; // safe to expose; RLS protects data
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const Backend = {
@@ -396,25 +411,20 @@
       const { data: { user } } = await supabase.auth.getUser();
       return user;
     },
-
     async signUp(email, password) {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
-      return data; // may require email confirmation depending on your Auth settings
+      return data;
     },
-
     async signIn(email, password) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       return data;
     },
-
     async signOut() {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
-
-    // (optional helpers if you’re saving calcs)
     async saveCalculation(row) {
       const user = await this.user();
       if (!user) throw new Error('Not signed in');
@@ -423,96 +433,51 @@
       if (error) throw error;
       return data;
     },
-
     async listCalculations() {
-      // robust: works even if created_at wasn’t added yet
       let { data, error } = await supabase
         .from('calculations')
         .select('id, data, created_at')
         .order('created_at', { ascending: false });
-
       if (error && (error.message || '').toLowerCase().includes('created_at')) {
         ({ data, error } = await supabase.from('calculations').select('id, data'));
       }
       if (error) throw error;
       return data || [];
     },
-
     async deleteCalculation(id) {
       const { error } = await supabase.from('calculations').delete().eq('id', id);
       if (error) throw error;
     }
   };
 
-  // --- Sign-out button wiring ---
-  const logoutBtn = document.getElementById('logoutBtn');
-  if (logoutBtn) {
-    logoutBtn.onclick = async () => {
-      try {
-        await Backend.signOut();
-        // guaranteed clean UI state
-        window.location.reload();
-      } catch (e) {
-        alert(e?.message || 'Sign-out failed');
-        console.error(e);
-      }
-    };
+  // Sign in/out UI
+  const whoami = document.getElementById('whoami');
+  const email = document.getElementById('authEmail');
+  const password = document.getElementById('authPassword');
+  document.getElementById('signupBtn').onclick = async () => {
+    if (!email.value || !password.value) return alert('Enter email & password');
+    try { await Backend.signUp(email.value, password.value); alert('Account created. Check email if confirmation required.'); }
+    catch (e) { alert(e.message || 'Sign-up failed'); }
+  };
+  document.getElementById('signinBtn').onclick = async () => {
+    if (!email.value || !password.value) return alert('Enter email & password');
+    try { await Backend.signIn(email.value, password.value); }
+    catch (e) { alert(e.message || 'Sign-in failed'); }
+  };
+  document.getElementById('logoutBtn').onclick = async () => {
+    try { await Backend.signOut(); window.location.reload(); }
+    catch (e) { alert(e?.message || 'Sign-out failed'); console.error(e); }
+  };
+  async function refreshWho() {
+    const u = await Backend.user();
+    whoami.textContent = u ? `Signed in as ${u.email}` : 'Not signed in';
   }
-
-  // --- (optional) reflect auth state in UI ---
-  const whoami = document.getElementById('whoami'); // e.g. <small id="whoami"></small>
-  async function refreshAuthUI() {
-    const user = await Backend.user();
-    if (whoami) whoami.textContent = user ? `Signed in as ${user.email}` : 'Not signed in';
-  }
-  refreshAuthUI();
-
-  // if you use an auth listener:
-  supabase.auth.onAuthStateChange((_event, _session) => {
-    refreshAuthUI();
-    // if you have a function that reloads calculations:
-    if (window.syncCalcsFromCloud) window.syncCalcsFromCloud();
-  });
-</script>
-
-<!-- Auth wiring: email/password + reactive sync -->
-<script>
-  (async function () {
-    const whoami = document.getElementById('whoami');
-    const email = document.getElementById('authEmail');
-    const password = document.getElementById('authPassword');
-    const signupBtn = document.getElementById('signupBtn');
-    const signinBtn = document.getElementById('signinBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
-
-    async function refreshWho() {
-      const u = await Backend.user();
-      if (whoami) whoami.textContent = u ? `Signed in as ${u.email}` : 'Not signed in';
-    }
-
-    signupBtn && (signupBtn.onclick = async () => {
-      if (!email.value || !password.value) return alert('Enter email & password');
-      try { await Backend.signUp(email.value, password.value); alert('Account created. Check your email if confirmation is required.'); }
-      catch (e) { alert(e.message || 'Sign-up failed'); }
-    });
-
-    signinBtn && (signinBtn.onclick = async () => {
-      if (!email.value || !password.value) return alert('Enter email & password');
-      try { await Backend.signIn(email.value, password.value); }
-      catch (e) { alert(e.message || 'Sign-in failed'); }
-    });
-
-    logoutBtn && (logoutBtn.onclick = async () => { await Backend.signOut(); });
-
+  supabase.auth.onAuthStateChange(async () => {
     await refreshWho();
-
-    // On auth state changes, migrate local → cloud (first time) then sync list
-    supabase.auth.onAuthStateChange(async () => {
-      await refreshWho();
-      if (window.migrateLocalCalcsToCloudIfNeeded) await window.migrateLocalCalcsToCloudIfNeeded();
-      if (window.syncCalcsFromCloud) await window.syncCalcsFromCloud();
-    });
-  })();
+    if (window.migrateLocalCalcsToCloudIfNeeded) await window.migrateLocalCalcsToCloudIfNeeded();
+    if (window.syncCalcsFromCloud) await window.syncCalcsFromCloud();
+  });
+  refreshWho();
 </script>
 
 <!-- Main App Script -->
@@ -537,6 +502,7 @@
   const daysSelect = $('#daysToSell');
   const renovationSection = $('#renovationSection');
   const renovationOptionsDiv = $('#renovationOptions');
+  const propertyTypeGroup = document.getElementById('propertyTypeGroup');
   const calculateBtn = $('#calculateBtn');
   const clearBtn = $('#clearBtn');
   const saveBtn = $('#saveBtn');
@@ -573,7 +539,6 @@
   const pdfList = $('#pdfList');
 
   let currentOffers = null;
-  // CLOUD: start empty; hydrate from cloud or fallback to local later
   let savedCalculations = [];
 
   // Renovation matrix
@@ -591,9 +556,45 @@
   function formatMoneyInput(el){ if(!el) return; el.addEventListener('input', function(){ let val = this.value.replace(/,/g,''); if(val && !isNaN(val)){ this.value = parseInt(val,10).toLocaleString(); } else if(val === '') this.value = ''; }); }
   [ priceInput,'val_marketValue','val_spreadOffer','val_redemption','val_requiredReneg','c1_listPrice','c1_soldPrice','c2_listPrice','c2_soldPrice','c3_listPrice','c3_soldPrice' ].forEach(id=> formatMoneyInput(typeof id==='string' ? document.getElementById(id) : id));
 
-  function populateRenovations(){ const type = propertyTypeSelect.value; renovationOptionsDiv.innerHTML=''; if(!type) return; const costs = renovationCosts[type]; Object.keys(costs).forEach(item => { const cost = costs[item]; const disabled = cost === null ? 'disabled' : ''; const label = cost === null ? `${item} (N/A)` : `${item} (£${cost.toLocaleString()})`; const row = document.createElement('label'); row.innerHTML = `<input type="checkbox" value="${item}" ${disabled}> ${label}`; renovationOptionsDiv.appendChild(row); }); }
-  propertyTypeSelect.addEventListener('change', ()=>{ const hasType = !!propertyTypeSelect.value; renovationSection.style.display = hasType ? 'block' : 'none'; renovationOptionsDiv.style.display = 'none'; if(hasType) populateRenovations(); });
-  $('#renovationSection').addEventListener('change', (e)=>{ if(e.target.name === 'includeRenov'){ renovationOptionsDiv.style.display = (e.target.value === 'yes') ? 'grid' : 'none'; } calculateOffer(); });
+  // Renovations flow
+  function populateRenovations(){
+    const type = propertyTypeSelect.value;
+    renovationOptionsDiv.innerHTML = '';
+    if (!type) return;
+    const costs = renovationCosts[type];
+    Object.keys(costs).forEach(item => {
+      const cost = costs[item];
+      const disabled = cost === null ? 'disabled' : '';
+      const label = cost === null ? `${item} (N/A)` : `${item} (£${cost.toLocaleString()})`;
+      const row = document.createElement('label');
+      row.innerHTML = `<input type="checkbox" value="${item}" ${disabled}> ${label}`;
+      renovationOptionsDiv.appendChild(row);
+    });
+  }
+
+  renovationSection.addEventListener('change', (e) => {
+    if (e.target.name === 'includeRenov') {
+      const include = e.target.value === 'yes';
+      propertyTypeGroup.style.display = include ? 'block' : 'none';
+      renovationOptionsDiv.style.display = 'none';
+      if (!include) {
+        propertyTypeSelect.value = '';
+        renovationOptionsDiv.innerHTML = '';
+      }
+      calculateOffer();
+    }
+  });
+
+  propertyTypeSelect.addEventListener('change', () => {
+    if (propertyTypeSelect.value) {
+      populateRenovations();
+      renovationOptionsDiv.style.display = 'grid';
+    } else {
+      renovationOptionsDiv.style.display = 'none';
+      renovationOptionsDiv.innerHTML = '';
+    }
+    calculateOffer();
+  });
 
   function calculateOffer(){
     const rawPrice = priceInput.value.replace(/,/g,'');
@@ -609,13 +610,21 @@
     let bottomOffer = roundToNearestThousand(baseBottom);
     let topOffer = roundToNearestThousand(baseTop);
     if(bottomOffer < 0) bottomOffer = 0; if(topOffer < 0) topOffer = 0;
-    const type = propertyTypeSelect.value;
+
     const includeRenov = document.querySelector('input[name="includeRenov"]:checked')?.value === 'yes';
     let selectedRenov = []; let totalRenovation = 0;
-    if(type && includeRenov){ selectedRenov = [...renovationOptionsDiv.querySelectorAll('input:checked')].map(cb => cb.value); selectedRenov.forEach(item => { totalRenovation += renovationCosts[type][item] || 0; }); }
+    if (includeRenov) {
+      const type = propertyTypeSelect.value;
+      if (type) {
+        selectedRenov = [...renovationOptionsDiv.querySelectorAll('input:checked')].map(cb => cb.value);
+        selectedRenov.forEach(item => { totalRenovation += renovationCosts[type][item] || 0; });
+      }
+    }
+
     const adjBottom = Math.max(0, roundToNearestThousand(bottomOffer - totalRenovation));
     const adjTop = Math.max(0, roundToNearestThousand(topOffer - totalRenovation));
     currentOffers = { bottom:bottomOffer, top:topOffer, adjBottom, adjTop, renovations:selectedRenov };
+
     const adjClass = adjBottom >= bottomOffer ? 'adjusted-green' : 'adjusted-red';
     resultDiv.innerHTML = `
       <div class="original-offer">Original Offer: £${bottomOffer.toLocaleString()} - £${topOffer.toLocaleString()}</div>
@@ -626,7 +635,7 @@
 
   calculateBtn.addEventListener('click', calculateOffer);
   priceInput.addEventListener('keypress', e=>{ if(e.key==='Enter') calculateOffer(); });
-  clearBtn.addEventListener('click', ()=>{ if(!confirm('Clear current inputs?')) return; customerInput.value=''; priceInput.value=''; daysSelect.value='7'; propertyTypeSelect.value=''; renovationSection.style.display='none'; resultDiv.textContent=''; renovationOptionsDiv.innerHTML=''; currentOffers=null; });
+  clearBtn.addEventListener('click', ()=>{ if(!confirm('Clear current inputs?')) return; customerInput.value=''; priceInput.value=''; daysSelect.value='7'; propertyTypeSelect.value=''; propertyTypeGroup.style.display='none'; renovationOptionsDiv.style.display='none'; resultDiv.textContent=''; renovationOptionsDiv.innerHTML=''; currentOffers=null; });
 
   // ----- Saved Calculations (CLOUD + local fallback) -----
   function renderSavedCalc(){
@@ -642,7 +651,6 @@
           <small style="opacity:.8">Saved: ${entry.timestamp}</small>
           <button class="del-btn" title="Delete">Del</button>
         `;
-        // DELETE: cloud if id exists; else local
         div.querySelector('.del-btn').addEventListener('click', async (ev)=>{
           ev.stopPropagation();
           if(!confirm('Delete this saved calculation?')) return;
@@ -657,7 +665,6 @@
     });
   }
 
-  // Sync helper: prefer cloud if signed in, else local
   async function syncCalcsFromCloud(){
     try {
       const user = await Backend.user();
@@ -673,48 +680,60 @@
       savedCalculations = Storage.get('hsdSaved') || []; renderSavedCalc();
     }
   }
-  // expose globally so auth listener can call it
   window.syncCalcsFromCloud = syncCalcsFromCloud;
 
   // SAVE: cloud when signed in; otherwise local
   saveBtn.addEventListener('click', async ()=>{
     if(!customerInput.value.trim()){ return showToast('Enter customer name first'); }
     if(!currentOffers){ return showToast('Calculate offer first'); }
+    const includeRenov = document.querySelector('input[name="includeRenov"]:checked')?.value === 'yes';
     const entry = {
       name: customerInput.value.trim(),
       listedPrice: priceInput.value,
       timeframe: daysSelect.value,
-      propertyType: propertyTypeSelect.value,
-      renovations: currentOffers.renovations,
+      includeRenov,
+      propertyType: includeRenov ? (document.getElementById('propertyType')?.value || '') : '',
+      renovations: currentOffers.renovations || [],
       originalOffer: { bottom: currentOffers.bottom, top: currentOffers.top },
       adjustedOffer: { bottom: currentOffers.adjBottom, top: currentOffers.adjTop },
-      timestamp: new Date().toLocaleString()
+      timestamp: new Date().toISOString()
     };
     const user = await Backend.user();
     if (user){
       try { await Backend.saveCalculation(entry); showToast('Saved to cloud'); await syncCalcsFromCloud(); }
-      catch(e){ console.error(e); showToast('Cloud save failed — saved locally'); const local = Storage.get('hsdSaved') || []; local.push(entry); Storage.set('hsdSaved', local); savedCalculations = local; renderSavedCalc(); }
+      catch(e){ console.error(e); showToast('Cloud save failed — saved locally'); const local = Storage.get('hsdSaved') || []; local.unshift(entry); Storage.set('hsdSaved', local); savedCalculations = local; renderSavedCalc(); }
     } else {
-      savedCalculations.push(entry); Storage.set('hsdSaved', savedCalculations); renderSavedCalc(); showToast('Saved locally');
+      const local = Storage.get('hsdSaved') || [];
+      local.unshift(entry);
+      Storage.set('hsdSaved', local);
+      savedCalculations = local; renderSavedCalc(); showToast('Saved locally (sign in to sync)');
     }
   });
 
   searchCalc.addEventListener('input', debounce(renderSavedCalc, 160));
   clearAllCalc.addEventListener('click', ()=>{ if(!savedCalculations.length) return showToast('Nothing to clear'); if(!confirm('Clear ALL saved calculations?')) return; savedCalculations = []; Storage.set('hsdSaved', savedCalculations); renderSavedCalc(); showToast('All calculations cleared'); });
 
-  // run initial sync
+  // initial sync
   syncCalcsFromCloud();
 
   // ----- Tabs -----
   const tabBtns = $$('.tab-btn');
   const tabSections = $$('.tab-section');
-  tabBtns.forEach(btn=>{ btn.addEventListener('click', ()=>{ tabBtns.forEach(b=>b.classList.remove('active')); btn.classList.add('active'); tabSections.forEach(sec=>sec.style.display='none'); document.getElementById(btn.dataset.tab).style.display='block'; if(btn.dataset.tab === 'valuations'){ sidebar.classList.add('wide'); } else { sidebar.classList.remove('wide'); } }); });
+  tabBtns.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      tabBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      tabSections.forEach(sec=>sec.style.display='none');
+      document.getElementById(btn.dataset.tab).style.display='block';
+      if(btn.dataset.tab === 'valuations'){ sidebar.classList.add('wide'); } else { sidebar.classList.remove('wide'); }
+    });
+  });
 
   // Overlay (text)
   closeOverlay.addEventListener('click', ()=>{ overlay.style.display='none'; });
   copyOverlay.addEventListener('click', ()=>{ navigator.clipboard.writeText(overlayText.innerText || ''); showToast('Copied'); });
 
-  // Overlay helpers for objections
+  // Templates/Objections helpers (same as before)
   function setupOverlay(storageKey, titleInputId, contentInputId, listId, saveBtnId, searchId){
     const listDiv = document.getElementById(listId);
     const titleInput = document.getElementById(titleInputId);
@@ -744,7 +763,6 @@
   }
   setupOverlay('objections','newObjTitle','newObjContent','objList','saveObj','searchObj');
 
-  // Templates (emails, sms)
   function setupTemplate(storageKey, titleId, contentId, listId, saveBtnId, searchId, clearId){
     let items = Storage.get(storageKey);
     const titleInput = document.getElementById(titleId);
@@ -776,8 +794,11 @@
   setupTemplate('emails','newEmailTitle','newEmailContent','emailList','saveEmail','searchEmail','clearAllEmails');
   setupTemplate('smsTemplates','newSMSTitle','newSMSContent','smsList','saveSMS','searchSMS','clearAllSMS');
 
-  // ---------- Valuations: Save/List/View (local for now) ----------
-  const valuationFields = [ 'val_customerName','val_address1','val_postcode','val_marketValue','val_spreadOffer','val_redemption','val_days','val_requiredReneg','val_justification', 'c1_url','c1_address','c1_agent','c1_dates','c1_listPrice','c1_reductions','c1_sqft','c1_agentNotes','c1_soldPrice','c1_offerDate','c1_viewings','c1_offers','c1_eaOpinion', 'c2_url','c2_address','c2_agent','c2_dates','c2_listPrice','c2_reductions','c2_sqft','c2_agentNotes','c2_soldPrice','c2_offerDate','c2_viewings','c2_offers','c2_eaOpinion', 'c3_url','c3_address','c3_agent','c3_dates','c3_listPrice','c3_reductions','c3_sqft','c3_agentNotes','c3_soldPrice','c3_offerDate','c3_viewings','c3_offers','c3_eaOpinion' ];
+  // ---------- Valuations: local ----------
+  const valuationFields = [ 'val_customerName','val_address1','val_postcode','val_marketValue','val_spreadOffer','val_redemption','val_days','val_requiredReneg','val_justification',
+    'c1_url','c1_address','c1_agent','c1_dates','c1_listPrice','c1_reductions','c1_sqft','c1_agentNotes','c1_soldPrice','c1_offerDate','c1_viewings','c1_offers','c1_eaOpinion',
+    'c2_url','c2_address','c2_agent','c2_dates','c2_listPrice','c2_reductions','c2_sqft','c2_agentNotes','c2_soldPrice','c2_offerDate','c2_viewings','c2_offers','c2_eaOpinion',
+    'c3_url','c3_address','c3_agent','c3_dates','c3_listPrice','c3_reductions','c3_sqft','c3_agentNotes','c3_soldPrice','c3_offerDate','c3_viewings','c3_offers','c3_eaOpinion' ];
   const valSearch = $('#valSearch');
   const valuationList = $('#valuationList');
   const saveValuationBtn = $('#saveValuation');
@@ -787,7 +808,22 @@
   function getValuationFromForm(){ const obj = {}; valuationFields.forEach(id => { const el = document.getElementById(id); obj[id] = el ? el.value.trim() : ''; }); obj.timestamp = new Date().toLocaleString(); return obj; }
   function clearValuationForm(){ valuationFields.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; }); showToast('Valuation form cleared'); }
   clearValuationFormBtn.addEventListener('click', clearValuationForm);
-  function valuationToPrettyText(v){ const line = (label, key) => `${label}: ${v[key] || ''}`; return [ 'VALUATION CHECKLIST', line('Customer Name','val_customerName'), line('First Line of Address','val_address1'), line('Postcode','val_postcode'), '', line('Market Value / Listed Price','val_marketValue'), line('Spread Offer Agreed','val_spreadOffer'), line('Redemption Figure','val_redemption'), line('Valuation Days','val_days'), line('Required Reneg','val_requiredReneg'), '', 'My Valuation / Justification:', v['val_justification'] || '', '', 'COMPARABLE 1', line('URL','c1_url'), line('Property Address','c1_address'), line('Estate Agent','c1_agent'), line('Listing Date (start–end)','c1_dates'), line('Listing Price','c1_listPrice'), line('Price Reductions','c1_reductions'), line('Square Footage','c1_sqft'), line('Estate Agent Notes','c1_agentNotes'), line('Sold Price','c1_soldPrice'), line('Date Offer Accepted','c1_offerDate'), line('Number of Viewings','c1_viewings'), line('Number of Offers','c1_offers'), line('EA Opinion — Our Subject','c1_eaOpinion'), '', 'COMPARABLE 2', line('URL','c2_url'), line('Property Address','c2_address'), line('Estate Agent','c2_agent'), line('Listing Date (start–end)','c2_dates'), line('Listing Price','c2_listPrice'), line('Price Reductions','c2_reductions'), line('Square Footage','c2_sqft'), line('Estate Agent Notes','c2_agentNotes'), line('Sold Price','c2_soldPrice'), line('Date Offer Accepted','c2_offerDate'), line('Number of Viewings','c2_viewings'), line('Number of Offers','c2_offers'), line('EA Opinion — Our Subject','c2_eaOpinion'), '', 'COMPARABLE 3', line('URL','c3_url'), line('Property Address','c3_address'), line('Estate Agent','c3_agent'), line('Listing Date (start–end)','c3_dates'), line('Listing Price','c3_listPrice'), line('Price Reductions','c3_reductions'), line('Square Footage','c3_sqft'), line('Estate Agent Notes','c3_agentNotes'), line('Sold Price','c3_soldPrice'), line('Date Offer Accepted','c3_offerDate'), line('Number of Viewings','c3_viewings'), line('Number of Offers','c3_offers'), line('EA Opinion — Our Subject','c3_eaOpinion'), ].join('\n\n'); }
+  function valuationToPrettyText(v){ const line = (label, key) => `${label}: ${v[key] || ''}`; return [
+    'VALUATION CHECKLIST', line('Customer Name','val_customerName'), line('First Line of Address','val_address1'), line('Postcode','val_postcode'), '',
+    line('Market Value / Listed Price','val_marketValue'), line('Spread Offer Agreed','val_spreadOffer'), line('Redemption Figure','val_redemption'),
+    line('Valuation Days','val_days'), line('Required Reneg','val_requiredReneg'), '', 'My Valuation / Justification:', v['val_justification'] || '', '',
+    'COMPARABLE 1', line('URL','c1_url'), line('Property Address','c1_address'), line('Estate Agent','c1_agent'), line('Listing Date (start–end)','c1_dates'),
+    line('Listing Price','c1_listPrice'), line('Price Reductions','c1_reductions'), line('Square Footage','c1_sqft'), line('Estate Agent Notes','c1_agentNotes'),
+    line('Sold Price','c1_soldPrice'), line('Date Offer Accepted','c1_offerDate'), line('Number of Viewings','c1_viewings'), line('Number of Offers','c1_offers'),
+    line('EA Opinion — Our Subject','c1_eaOpinion'), '',
+    'COMPARABLE 2', line('URL','c2_url'), line('Property Address','c2_address'), line('Estate Agent','c2_agent'), line('Listing Date (start–end)','c2_dates'),
+    line('Listing Price','c2_listPrice'), line('Price Reductions','c2_reductions'), line('Square Footage','c2_sqft'), line('Estate Agent Notes','c2_agentNotes'),
+    line('Sold Price','c2_soldPrice'), line('Date Offer Accepted','c2_offerDate'), line('Number of Viewings','c2_viewings'), line('Number of Offers','c2_offers'),
+    line('EA Opinion — Our Subject','c2_eaOpinion'), '',
+    'COMPARABLE 3', line('URL','c3_url'), line('Property Address','c3_address'), line('Estate Agent','c3_agent'), line('Listing Date (start–end)','c3_dates'),
+    line('Listing Price','c3_listPrice'), line('Price Reductions','c3_reductions'), line('Square Footage','c3_sqft'), line('Estate Agent Notes','c3_agentNotes'),
+    line('Sold Price','c3_soldPrice'), line('Date Offer Accepted','c3_offerDate'), line('Number of Viewings','c3_viewings'), line('Number of Offers','c3_offers'),
+    line('EA Opinion — Our Subject','c3_eaOpinion') ].join('\n\n'); }
   function renderValuations(){ const search = (valSearch.value || '').toLowerCase(); valuationList.innerHTML = ''; valuations.forEach((v,i)=>{ const name = v['val_customerName'] || '(No name)'; const addr1 = v['val_address1'] || ''; const postcode = (v['val_postcode'] || '').toLowerCase(); if(!search || postcode.includes(search)){ const div = document.createElement('div'); div.className = 'saved-entry'; div.innerHTML = ` <div style="font-weight:600">${name} – ${addr1}</div> <small style="opacity:.8">${v.timestamp || ''}</small> <button class="del-btn">Del</button> <button class="copy-btn">Copy</button> `; div.addEventListener('click', (ev)=>{ if(ev.target.closest('button')) return; overlayTitle.innerText = name + ' — Valuation'; overlayText.innerText = valuationToPrettyText(v); overlay.style.display='flex'; }); div.querySelector('.copy-btn').addEventListener('click', (ev)=>{ ev.stopPropagation(); navigator.clipboard.writeText(valuationToPrettyText(v)); showToast('Valuation copied'); }); div.querySelector('.del-btn').addEventListener('click', (ev)=>{ ev.stopPropagation(); if(!confirm('Delete this valuation?')) return; valuations.splice(i,1); Storage.set('valuations', valuations); renderValuations(); showToast('Deleted'); }); valuationList.appendChild(div); } }); }
   saveValuationBtn.addEventListener('click', ()=>{ const v = getValuationFromForm(); if(!v.val_customerName){ return showToast('Add a Customer Name before saving'); } valuations.push(v); Storage.set('valuations', valuations); renderValuations(); showToast('Valuation saved'); });
   valSearch.addEventListener('input', debounce(renderValuations, 160));
@@ -828,7 +864,7 @@
   searchPdfs.addEventListener('input', debounce(renderPDFs, 150));
   renderPDFs();
 
-  // One-time migration: if first cloud login and local has items → import to cloud
+  // One-time migration: local → cloud
   window.migrateLocalCalcsToCloudIfNeeded = async function(){
     try {
       const user = await Backend.user(); if (!user) return;
