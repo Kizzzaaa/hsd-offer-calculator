@@ -396,42 +396,83 @@
       const { data: { user } } = await supabase.auth.getUser();
       return user;
     },
+
     async signUp(email, password) {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
-      return data; // may require email confirmation depending on settings
+      return data; // may require email confirmation depending on your Auth settings
     },
+
     async signIn(email, password) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       return data;
     },
-    async signOut() { await supabase.auth.signOut(); },
 
-    // CALCULATIONS table CRUD
+    async signOut() {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    },
+
+    // (optional helpers if you’re saving calcs)
+    async saveCalculation(row) {
+      const user = await this.user();
+      if (!user) throw new Error('Not signed in');
+      const payload = { user_id: user.id, data: row };
+      const { data, error } = await supabase.from('calculations').insert(payload).select('id').single();
+      if (error) throw error;
+      return data;
+    },
+
     async listCalculations() {
-      const { data, error } = await supabase
+      // robust: works even if created_at wasn’t added yet
+      let { data, error } = await supabase
         .from('calculations')
-        .select('id, data')
+        .select('id, data, created_at')
         .order('created_at', { ascending: false });
+
+      if (error && (error.message || '').toLowerCase().includes('created_at')) {
+        ({ data, error } = await supabase.from('calculations').select('id, data'));
+      }
       if (error) throw error;
       return data || [];
     },
-    async saveCalculation(entry) {
-      const u = await this.user(); if (!u) throw new Error('Sign in first');
-      const { error } = await supabase
-        .from('calculations')
-        .insert({ user_id: u.id, data: entry });
-      if (error) throw error;
-    },
+
     async deleteCalculation(id) {
-      const { error } = await supabase
-        .from('calculations')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('calculations').delete().eq('id', id);
       if (error) throw error;
     }
   };
+
+  // --- Sign-out button wiring ---
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.onclick = async () => {
+      try {
+        await Backend.signOut();
+        // guaranteed clean UI state
+        window.location.reload();
+      } catch (e) {
+        alert(e?.message || 'Sign-out failed');
+        console.error(e);
+      }
+    };
+  }
+
+  // --- (optional) reflect auth state in UI ---
+  const whoami = document.getElementById('whoami'); // e.g. <small id="whoami"></small>
+  async function refreshAuthUI() {
+    const user = await Backend.user();
+    if (whoami) whoami.textContent = user ? `Signed in as ${user.email}` : 'Not signed in';
+  }
+  refreshAuthUI();
+
+  // if you use an auth listener:
+  supabase.auth.onAuthStateChange((_event, _session) => {
+    refreshAuthUI();
+    // if you have a function that reloads calculations:
+    if (window.syncCalcsFromCloud) window.syncCalcsFromCloud();
+  });
 </script>
 
 <!-- Auth wiring: email/password + reactive sync -->
