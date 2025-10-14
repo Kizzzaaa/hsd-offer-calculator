@@ -1,0 +1,2201 @@
+<!DOCTYPE html> 
+
+<html lang="en"> 
+
+<head> 
+
+<meta charset="UTF-8" /> 
+
+<meta name="viewport" content="width=device-width, initial-scale=1" /> 
+
+<title>HSD Offer Calculator & Templates — Valuations + PDF Scripts</title> 
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet"> 
+
+<style> 
+
+  :root{ 
+
+    --bg:#dcefff; 
+
+    --card:#ffffff; 
+
+    --ink:#222; 
+
+    --muted:#333; 
+
+    --brand:#1a73e8; 
+
+    --brand-700:#155bb5; 
+
+    --soft:#f5f9ff; 
+
+    --good:#e6ffed; 
+
+    --bad:#ffe6e6; 
+
+    --ring: rgba(26,115,232,0.35); 
+
+    --border:#cbd5e1; 
+
+    --chip:#e6f0fa; 
+
+  } 
+
+  [data-theme="dark"]{ 
+
+    --bg:#0f172a; 
+
+    --card:#111827; 
+
+    --ink:#e5e7eb; 
+
+    --muted:#cbd5e1; 
+
+    --brand:#60a5fa; 
+
+    --brand-700:#3b82f6; 
+
+    --soft:#0b1222; 
+
+    --good:#083b15; 
+
+    --bad:#3b0909; 
+
+    --ring: rgba(96,165,250,0.45); 
+
+    --border:#1f2a37; 
+
+    --chip:#0b1222; 
+
+  } 
+
+  *{box-sizing:border-box} 
+
+  html,body{height:100%} 
+
+  body { 
+
+    font-family:'Poppins',sans-serif; 
+
+    background:var(--bg); 
+
+    color:var(--ink); 
+
+    margin:0; 
+
+    display:flex; 
+
+    justify-content:center; 
+
+    align-items:flex-start; 
+
+    padding:20px; 
+
+  } 
+
+  a{color:var(--brand)} 
+
+  .flex-container{display:flex;gap:30px;max-width:1800px;width:100%;align-items:flex-start} 
+
+  .stack{display:flex;flex-direction:column;gap:12px} 
+
+  .calculator,.sidebar{ 
+
+    background:var(--card); 
+
+    padding:24px; 
+
+    border-radius:16px; 
+
+    box-shadow:0 15px 30px rgba(0,0,0,0.10); 
+
+  } 
+
+  .calculator{width:640px;position:relative} 
+
+  h2{margin:0 0 16px;font-size:28px;color:var(--brand);text-align:center} 
+
+  label{display:block;margin-bottom:6px;font-weight:600;color:var(--muted)} 
+
+  input,select,textarea,button{font-family:'Poppins',sans-serif;font-size:16px} 
+
+  input,select,textarea{ 
+
+    width:100%;padding:12px;border:1px solid var(--border);background:transparent;color:var(--ink); 
+
+    border-radius:10px;margin-bottom:14px;outline:none; 
+
+  } 
+
+  input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)} 
+
+  .button-group{display:flex;gap:10px;margin:10px 0;flex-wrap:wrap} 
+
+  button{ 
+
+    padding:12px 14px;border:none;border-radius:10px;background:var(--brand);color:#fff;cursor:pointer; 
+
+    font-weight:600;transition:.25s transform,.25s background; 
+
+  } 
+
+  button:hover{background:var(--brand-700);transform:translateY(-1px)} 
+
+  button.secondary{background:#94a3b8;color:#0b1020} 
+
+  button.ghost{background:transparent;border:1px solid var(--border);color:var(--ink)} 
+
+  .result-card{margin-top:18px;padding:16px;border-radius:12px;background:var(--soft);font-size:18px;font-weight:600} 
+
+  .original-offer{background:var(--chip);color:var(--brand);padding:8px;border-radius:8px;margin-bottom:6px} 
+
+  .adjusted-offer{padding:8px;border-radius:8px;font-weight:700} 
+
+  .adjusted-green{background:var(--good)} 
+
+  .adjusted-red{background:var(--bad)} 
+
+  .renovation-section{margin-top:14px;display:none} 
+
+  .renovation-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px} 
+
+  .renovation-options label{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer} 
+
+  .renovation-options input[type="checkbox"]{width:18px;height:18px;accent-color:var(--brand)} 
+
+  .sidebar{flex:1;display:flex;flex-direction:column;max-height:900px;position:sticky;top:20px;min-width:520px;transition:width .25s ease,max-width .25s ease} 
+
+  .sidebar.wide{min-width:960px;max-width:1200px;width:100%} 
+
+  .sidebar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px} 
+
+  .sidebar-header h2{font-size:22px;color:var(--brand);margin:0} 
+
+  .export-btn{background:transparent;border:none;cursor:pointer;font-size:16px;color:var(--brand);opacity:0.8;transition:.2s;padding:6px;border-radius:8px} 
+
+  .export-btn:hover{opacity:1;transform:scale(1.06);background:var(--soft)} 
+
+  .tab-buttons{display:flex;gap:8px;background:var(--chip);border-radius:12px;padding:6px;flex-wrap:wrap} 
+
+  .tab-buttons button{flex:1;border-radius:10px;margin:0;background:transparent;color:var(--ink);min-width:140px} 
+
+  .tab-buttons button.active{background:var(--brand);color:#fff} 
+
+  .tab-content{flex:1;overflow:auto;padding:12px;border:1px dashed var(--border);border-radius:12px;margin-top:10px} 
+
+  .tab-section{display:none} 
+
+  .saved-entry{padding:10px;margin-bottom:10px;background:var(--chip);border-radius:10px;font-size:14px;position:relative;cursor:pointer;word-wrap:break-word} 
+
+  .saved-entry button{position:absolute;top:6px;padding:4px 8px;font-size:12px;border-radius:6px} 
+
+  .saved-entry .del-btn{background:#ef4444;color:#fff;right:6px} 
+
+  .saved-entry .copy-btn{background:var(--brand);color:#fff;right:62px} 
+
+  .v-section{background:var(--soft);border:1px solid var(--border);padding:18px;border-radius:12px;margin:14px 0} 
+
+  .v-title{margin:0 0 12px;font-size:20px;color:var(--brand)} 
+
+  .v-field{margin-bottom:14px} 
+
+  .collapsible{background:var(--card);border:1px solid var(--border);border-radius:12px;margin:10px 0;overflow:hidden} 
+
+  .collapsible summary{list-style:none;cursor:pointer;padding:14px 16px;font-weight:600;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center} 
+
+  .collapsible[open] summary{background:var(--chip)} 
+
+  .caret{transition:transform .2s ease} 
+
+  .collapsible[open] .caret{transform:rotate(180deg)} 
+
+  .collapsible .content{padding:16px} 
+
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.35);z-index:2000;opacity:.98} 
+
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:3000;padding:40px;justify-content:center;align-items:center;overflow:auto} 
+
+  .overlay-content{background:var(--card);color:var(--ink);border-radius:14px;max-width:1000px;width:95%;max-height:90%;margin:0 auto;padding:20px;position:relative;overflow:auto;white-space:pre-wrap} 
+
+  .overlay-content h3{margin-top:0} 
+
+  .close-overlay{position:absolute;top:10px;right:12px;background:#ef4444;color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer} 
+
+  .overlay-actions{position:sticky;top:0;display:flex;gap:8px;justify-content:flex-end;margin-bottom:8px} 
+
+  #themeToggle{position:fixed;top:20px;right:20px;font-size:14px;width:36px;height:36px;border-radius:50%;display:flex;justify-content:center;align-items:center;background:var(--soft);border:1px solid var(--border);cursor:pointer;transition:.25s;z-index:3500} 
+
+  #themeToggle:hover{background:var(--brand);color:#fff;border-color:var(--brand)} 
+
+  /* PDF overlay iframe full */ 
+
+  #pdfOverlayFrame{width:100%;height:80vh;border:none;border-radius:10px;background:#fff} 
+
+  .pdf-actions{display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px} 
+
+  .tiny-btn{padding:6px 8px;font-size:12px;border-radius:8px} 
+
+  @media (max-width: 1100px){ 
+
+    .flex-container{flex-direction:column;align-items:stretch} 
+
+    .calculator{width:100%} 
+
+    .sidebar{min-width:unset} 
+
+    .sidebar.wide{min-width:unset;max-width:unset;width:100%} 
+
+  } 
+
+</style> 
+
+</head> 
+
+<body> 
+
+<button id="themeToggle" aria-label="Toggle dark mode">🌙</button> 
+
+ 
+
+<div class="flex-container"> 
+
+ 
+
+  <!-- Calculator --> 
+
+  <div class="calculator"> 
+
+    <h2>HSD Offer Calculator</h2> 
+
+ 
+
+    <label for="customerName">Customer Name</label> 
+
+    <input type="text" id="customerName" placeholder="Enter customer name" autofocus aria-label="Customer name"> 
+
+ 
+
+    <label for="listedPrice">Listed Price (£)</label> 
+
+    <input type="text" id="listedPrice" inputmode="numeric" placeholder="e.g. 245,000" aria-label="Listed price"> 
+
+ 
+
+    <div class="stack"> 
+
+      <div> 
+
+        <label for="daysToSell">Timeframe</label> 
+
+        <select id="daysToSell" aria-label="Timeframe to sell"> 
+
+          <option value="7">7 Days</option> 
+
+          <option value="30">30 Days</option> 
+
+          <option value="90">90 Days</option> 
+
+          <option value="180">180 Days</option> 
+
+        </select> 
+
+      </div> 
+
+      <div> 
+
+        <label for="propertyType">Property Type</label> 
+
+        <select id="propertyType" aria-label="Property type"> 
+
+          <option value="">Select property type</option> 
+
+          <option value="2 bed flat">2 Bed Flat</option> 
+
+          <option value="2 bed terrace">2 Bed Terrace</option> 
+
+          <option value="3 bed semi">3 Bed Semi</option> 
+
+          <option value="4 bed detached">4 Bed Detached</option> 
+
+          <option value="4 bed townhouse">4 Bed Townhouse</option> 
+
+          <option value="3 bed end terrace">3 Bed End Terrace</option> 
+
+          <option value="3 bed bungalow">3 Bed Bungalow</option> 
+
+        </select> 
+
+      </div> 
+
+    </div> 
+
+ 
+
+    <div class="button-group"> 
+
+      <button id="calculateBtn">Calculate Offer</button> 
+
+      <button id="clearBtn" class="secondary">Clear</button> 
+
+    </div> 
+
+ 
+
+    <div class="result-card" id="result" aria-live="polite"></div> 
+
+ 
+
+    <div class="renovation-section" id="renovationSection" aria-hidden="true"> 
+
+      <label>Include Renovation Costs?</label> 
+
+      <div class="stack" role="radiogroup" aria-label="Include renovations"> 
+
+        <label><input type="radio" name="includeRenov" value="yes"> Yes</label> 
+
+        <label><input type="radio" name="includeRenov" value="no" checked> No</label> 
+
+      </div> 
+
+      <div class="renovation-options" id="renovationOptions" style="display:none"></div> 
+
+    </div> 
+
+ 
+
+    <div class="button-group"> 
+
+      <button id="saveBtn">Save Calculation</button> 
+
+    </div> 
+
+  </div> 
+
+ 
+
+  <!-- Sidebar --> 
+
+  <div class="sidebar" id="sidebar"> 
+
+    <div class="sidebar-header"> 
+
+      <h2>Templates & Saved Data</h2> 
+
+      <button id="exportBtn" class="export-btn" title="Export Backup">💾</button> 
+
+    </div> 
+
+ 
+
+    <div class="tab-buttons" role="tablist"> 
+
+      <button class="tab-btn active" data-tab="calculations" role="tab" aria-selected="true">Saved Calculations</button> 
+
+      <button class="tab-btn" data-tab="emails" role="tab">Email Templates</button> 
+
+      <button class="tab-btn" data-tab="sms" role="tab">SMS Templates</button> 
+
+      <button class="tab-btn" data-tab="objections" role="tab">Objections</button> 
+
+      <button class="tab-btn" data-tab="scripts" role="tab">Scripts</button> 
+
+      <button class="tab-btn" data-tab="valuations" role="tab">Valuations</button> 
+
+    </div> 
+
+ 
+
+    <div class="tab-content"> 
+
+ 
+
+      <div id="calculations" class="tab-section" style="display:block;"> 
+
+        <div class="stack"> 
+
+          <input type="text" id="searchCalc" placeholder="Search by customer name"> 
+
+          <button id="clearAllCalc" class="ghost">Clear Saved</button> 
+
+        </div> 
+
+        <div id="savedCalcList" class="stack" style="margin-top:10px"></div> 
+
+      </div> 
+
+ 
+
+      <div id="emails" class="tab-section"> 
+
+        <div class="stack"> 
+
+          <input type="text" id="newEmailTitle" placeholder="Template Name"> 
+
+          <textarea id="newEmailContent" placeholder="Email content" rows="5"></textarea> 
+
+          <button id="saveEmail">Save Email</button> 
+
+          <input type="text" id="searchEmail" placeholder="Search Emails"> 
+
+          <button id="clearAllEmails" class="ghost">Clear Emails</button> 
+
+        </div> 
+
+        <div id="emailList" class="stack" style="margin-top:10px"></div> 
+
+      </div> 
+
+ 
+
+      <div id="sms" class="tab-section"> 
+
+        <div class="stack"> 
+
+          <input type="text" id="newSMSTitle" placeholder="Template Name"> 
+
+          <textarea id="newSMSContent" placeholder="SMS content" rows="3"></textarea> 
+
+          <button id="saveSMS">Save SMS</button> 
+
+          <input type="text" id="searchSMS" placeholder="Search SMS Templates"> 
+
+          <button id="clearAllSMS" class="ghost">Clear SMS</button> 
+
+        </div> 
+
+        <div id="smsList" class="stack" style="margin-top:10px"></div> 
+
+      </div> 
+
+ 
+
+      <div id="objections" class="tab-section"> 
+
+        <div class="stack"> 
+
+          <input type="text" id="newObjTitle" placeholder="Objection Title"> 
+
+          <textarea id="newObjContent" placeholder="Objection Script" rows="5"></textarea> 
+
+          <button id="saveObj">Save Objection</button> 
+
+          <input type="text" id="searchObj" placeholder="Search Objections"> 
+
+        </div> 
+
+        <div id="objList" class="stack" style="margin-top:10px"></div> 
+
+      </div> 
+
+ 
+
+      <!-- SCRIPTS TAB — PDF UPLOAD & VIEWER --> 
+
+      <div id="scripts" class="tab-section"> 
+
+        <div class="stack"> 
+
+          <div class="button-group"> 
+
+            <input id="pdfInput" type="file" accept="application/pdf" multiple style="display:none"> 
+
+            <button id="uploadPdfBtn">Upload PDF Script(s)</button> 
+
+            <button id="clearAllPdfs" class="ghost">Clear All PDFs</button> 
+
+          </div> 
+
+          <input type="text" id="searchPdfs" placeholder="Search PDFs by name"> 
+
+        </div> 
+
+        <div id="pdfList" class="stack" style="margin-top:10px"></div> 
+
+      </div> 
+
+ 
+
+      <!-- VALUATIONS TAB --> 
+
+      <div id="valuations" class="tab-section"> 
+
+        <div class="v-section"> 
+
+          <details class="collapsible" id="val_main" open> 
+
+            <summary>Valuation Checklist <span class="caret">▾</span></summary> 
+
+            <div class="content"> 
+
+              <div class="v-field"> 
+
+                <label>Customer Name</label> 
+
+                <input id="val_customerName" type="text" placeholder="Customer name"> 
+
+              </div> 
+
+              <div class="v-field"> 
+
+                <label>First Line of Address</label> 
+
+                <input id="val_address1" type="text" placeholder="e.g. 12 High Street"> 
+
+              </div> 
+
+              <div class="v-field"> 
+
+                <label>Postcode</label> 
+
+                <input id="val_postcode" type="text" placeholder="e.g. SW1A 1AA"> 
+
+              </div> 
+
+              <div class="v-field"> 
+
+                <label>Market Value / Listed Price (£)</label> 
+
+                <input id="val_marketValue" type="text" placeholder="e.g. 250,000"> 
+
+              </div> 
+
+              <div class="v-field"> 
+
+                <label>Spread Offer Agreed (£)</label> 
+
+                <input id="val_spreadOffer" type="text" placeholder="e.g. 5,000"> 
+
+              </div> 
+
+              <div class="v-field"> 
+
+                <label>Redemption Figure (£)</label> 
+
+                <input id="val_redemption" type="text" placeholder=""> 
+
+              </div> 
+
+              <div class="v-field"> 
+
+                <label>Valuation Days</label> 
+
+                <input id="val_days" type="text" placeholder="7 / 30 / 90 / 180"> 
+
+              </div> 
+
+              <div class="v-field"> 
+
+                <label>Required Reneg (£)</label> 
+
+                <input id="val_requiredReneg" type="text" placeholder=""> 
+
+              </div> 
+
+              <div class="v-field"> 
+
+                <label>My Valuation / Justification</label> 
+
+                <textarea id="val_justification" rows="6" placeholder="Add reasoning, key points, risks, assumptions..."></textarea> 
+
+              </div> 
+
+              <div class="button-group"> 
+
+                <button id="clearValuationForm" class="ghost">Clear Valuation Form</button> 
+
+              </div> 
+
+            </div> 
+
+          </details> 
+
+        </div> 
+
+ 
+
+        <div class="v-section"> 
+
+          <h3 class="v-title">Comparable Information</h3> 
+
+ 
+
+          <details class="collapsible" id="comp1" open> 
+
+            <summary>Comparable 1 <span class="caret">▾</span></summary> 
+
+            <div class="content"> 
+
+              <div class="v-field"><label>URL</label><input id="c1_url" type="text" placeholder="https://..."></div> 
+
+              <div class="v-field"><label>Property Address</label><input id="c1_address" type="text"></div> 
+
+              <div class="v-field"><label>Estate Agent</label><input id="c1_agent" type="text"></div> 
+
+              <div class="v-field"><label>Listing Date (start–end)</label><input id="c1_dates" type="text" placeholder="DD/MM/YY – DD/MM/YY"></div> 
+
+              <div class="v-field"><label>Listing Price (£)</label><input id="c1_listPrice" type="text"></div> 
+
+              <div class="v-field"><label>Price Reductions (date & price)</label><input id="c1_reductions" type="text" placeholder="DD/MM/YY – £..."></div> 
+
+              <div class="v-field"><label>Square Footage</label><input id="c1_sqft" type="text"></div> 
+
+              <div class="v-field"><label>Estate Agent Notes</label><textarea id="c1_agentNotes" rows="3"></textarea></div> 
+
+              <div class="v-field"><label>Sold Price (£)</label><input id="c1_soldPrice" type="text"></div> 
+
+              <div class="v-field"><label>Date Offer Accepted</label><input id="c1_offerDate" type="text" placeholder="DD/MM/YY"></div> 
+
+              <div class="v-field"><label>Number of Viewings</label><input id="c1_viewings" type="text"></div> 
+
+              <div class="v-field"><label>Number of Offers</label><input id="c1_offers" type="text"></div> 
+
+              <div class="v-field"><label>EA Opinion — Our Subject</label><textarea id="c1_eaOpinion" rows="3"></textarea></div> 
+
+            </div> 
+
+          </details> 
+
+ 
+
+          <details class="collapsible" id="comp2"> 
+
+            <summary>Comparable 2 <span class="caret">▾</span></summary> 
+
+            <div class="content"> 
+
+              <div class="v-field"><label>URL</label><input id="c2_url" type="text" placeholder="https://..."></div> 
+
+              <div class="v-field"><label>Property Address</label><input id="c2_address" type="text"></div> 
+
+              <div class="v-field"><label>Estate Agent</label><input id="c2_agent" type="text"></div> 
+
+              <div class="v-field"><label>Listing Date (start–end)</label><input id="c2_dates" type="text" placeholder="DD/MM/YY – DD/MM/YY"></div> 
+
+              <div class="v-field"><label>Listing Price (£)</label><input id="c2_listPrice" type="text"></div> 
+
+              <div class="v-field"><label>Price Reductions (date & price)</label><input id="c2_reductions" type="text" placeholder="DD/MM/YY – £..."></div> 
+
+              <div class="v-field"><label>Square Footage</label><input id="c2_sqft" type="text"></div> 
+
+              <div class="v-field"><label>Estate Agent Notes</label><textarea id="c2_agentNotes" rows="3"></textarea></div> 
+
+              <div class="v-field"><label>Sold Price (£)</label><input id="c2_soldPrice" type="text"></div> 
+
+              <div class="v-field"><label>Date Offer Accepted</label><input id="c2_offerDate" type="text" placeholder="DD/MM/YY"></div> 
+
+              <div class="v-field"><label>Number of Viewings</label><input id="c2_viewings" type="text"></div> 
+
+              <div class="v-field"><label>Number of Offers</label><input id="c2_offers" type="text"></div> 
+
+              <div class="v-field"><label>EA Opinion — Our Subject</label><textarea id="c2_eaOpinion" rows="3"></textarea></div> 
+
+            </div> 
+
+          </details> 
+
+ 
+
+          <details class="collapsible" id="comp3"> 
+
+            <summary>Comparable 3 <span class="caret">▾</span></summary> 
+
+            <div class="content"> 
+
+              <div class="v-field"><label>URL</label><input id="c3_url" type="text" placeholder="https://..."></div> 
+
+              <div class="v-field"><label>Property Address</label><input id="c3_address" type="text"></div> 
+
+              <div class="v-field"><label>Estate Agent</label><input id="c3_agent" type="text"></div> 
+
+              <div class="v-field"><label>Listing Date (start–end)</label><input id="c3_dates" type="text" placeholder="DD/MM/YY – DD/MM/YY"></div> 
+
+              <div class="v-field"><label>Listing Price (£)</label><input id="c3_listPrice" type="text"></div> 
+
+              <div class="v-field"><label>Price Reductions (date & price)</label><input id="c3_reductions" type="text" placeholder="DD/MM/YY – £..."></div> 
+
+              <div class="v-field"><label>Square Footage</label><input id="c3_sqft" type="text"></div> 
+
+              <div class="v-field"><label>Estate Agent Notes</label><textarea id="c3_agentNotes" rows="3"></textarea></div> 
+
+              <div class="v-field"><label>Sold Price (£)</label><input id="c3_soldPrice" type="text"></div> 
+
+              <div class="v-field"><label>Date Offer Accepted</label><input id="c3_offerDate" type="text" placeholder="DD/MM/YY"></div> 
+
+              <div class="v-field"><label>Number of Viewings</label><input id="c3_viewings" type="text"></div> 
+
+              <div class="v-field"><label>Number of Offers</label><input id="c3_offers" type="text"></div> 
+
+              <div class="v-field"><label>EA Opinion — Our Subject</label><textarea id="c3_eaOpinion" rows="3"></textarea></div> 
+
+            </div> 
+
+          </details> 
+
+        </div> 
+
+ 
+
+        <div class="button-group"> 
+
+          <button id="saveValuation">Save Valuation</button> 
+
+          <input id="valSearch" type="text" placeholder="Search valuations by postcode" style="flex:1;min-width:260px"> 
+
+          <button id="clearAllValuations" class="ghost">Clear All Valuations</button> 
+
+        </div> 
+
+ 
+
+        <div id="valuationList" class="stack"></div> 
+
+      </div> 
+
+ 
+
+    </div> 
+
+  </div> 
+
+</div> 
+
+ 
+
+<!-- Overlay --> 
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlayTitle"> 
+
+  <div class="overlay-content"> 
+
+    <button class="close-overlay" id="closeOverlay" aria-label="Close overlay">Close</button> 
+
+    <div class="overlay-actions"> 
+
+      <button id="copyOverlay" class="ghost">Copy All</button> 
+
+    </div> 
+
+    <h3 id="overlayTitle"></h3> 
+
+    <pre id="overlayText"></pre> 
+
+  </div> 
+
+</div> 
+
+ 
+
+<!-- PDF Overlay --> 
+
+<div class="overlay" id="pdfOverlay" role="dialog" aria-modal="true" aria-labelledby="pdfOverlayTitle"> 
+
+  <div class="overlay-content"> 
+
+    <button class="close-overlay" id="closePdfOverlay" aria-label="Close PDF overlay">Close</button> 
+
+    <div class="pdf-actions"> 
+
+      <button id="downloadPdfBtn" class="ghost tiny-btn">Download</button> 
+
+      <button id="openPdfNewTabBtn" class="ghost tiny-btn">Open in New Tab</button> 
+
+    </div> 
+
+    <h3 id="pdfOverlayTitle">PDF Viewer</h3> 
+
+    <iframe id="pdfOverlayFrame"></iframe> 
+
+  </div> 
+
+</div> 
+
+ 
+
+<script> 
+
+(function(){ 
+
+  // ----- Utilities ----- 
+
+  const $ = sel => document.querySelector(sel); 
+
+  const $$ = sel => Array.from(document.querySelectorAll(sel)); 
+
+  const Storage = { 
+
+    get: (key) => JSON.parse(localStorage.getItem(key) || '[]'), 
+
+    set: (key, val) => localStorage.setItem(key, JSON.stringify(val)), 
+
+  }; 
+
+  function showToast(msg){ 
+
+    const t=document.createElement('div'); 
+
+    t.className='toast'; t.textContent=msg; 
+
+    document.body.appendChild(t); 
+
+    setTimeout(()=>{t.remove();}, 2200); 
+
+  } 
+
+  function debounce(fn, delay){ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a), delay);} } 
+
+  function roundToNearestThousand(n){ return Math.round(n/1000)*1000; } 
+
+  function getSpread(listedPrice){ 
+
+    if(listedPrice <= 149999) return 5000; 
+
+    if(listedPrice <= 249999) return 10000; 
+
+    if(listedPrice <= 349999) return 15000; 
+
+    if(listedPrice <= 449999) return 20000; 
+
+    return 25000; 
+
+  } 
+
+ 
+
+  // ----- Elements ----- 
+
+  const priceInput = $('#listedPrice'); 
+
+  const customerInput = $('#customerName'); 
+
+  const propertyTypeSelect = $('#propertyType'); 
+
+  const daysSelect = $('#daysToSell'); 
+
+  const renovationSection = $('#renovationSection'); 
+
+  const renovationOptionsDiv = $('#renovationOptions'); 
+
+  const calculateBtn = $('#calculateBtn'); 
+
+  const clearBtn = $('#clearBtn'); 
+
+  const saveBtn = $('#saveBtn'); 
+
+  const resultDiv = $('#result'); 
+
+  const themeToggle = $('#themeToggle'); 
+
+  const exportBtn = $('#exportBtn'); 
+
+  const sidebar = $('#sidebar'); 
+
+ 
+
+  // Saved calcs 
+
+  const savedCalcList = $('#savedCalcList'); 
+
+  const searchCalc = $('#searchCalc'); 
+
+  const clearAllCalc = $('#clearAllCalc'); 
+
+ 
+
+  // Overlay 
+
+  const overlay = $('#overlay'); 
+
+  const overlayTitle = $('#overlayTitle'); 
+
+  const overlayText = $('#overlayText'); 
+
+  const closeOverlay = $('#closeOverlay'); 
+
+  const copyOverlay = $('#copyOverlay'); 
+
+ 
+
+  // PDF overlay 
+
+  const pdfOverlay = $('#pdfOverlay'); 
+
+  const closePdfOverlay = $('#closePdfOverlay'); 
+
+  const pdfOverlayFrame = $('#pdfOverlayFrame'); 
+
+  const pdfOverlayTitle = $('#pdfOverlayTitle'); 
+
+  const downloadPdfBtn = $('#downloadPdfBtn'); 
+
+  const openPdfNewTabBtn = $('#openPdfNewTabBtn'); 
+
+ 
+
+  // Scripts PDFs 
+
+  const pdfInput = $('#pdfInput'); 
+
+  const uploadPdfBtn = $('#uploadPdfBtn'); 
+
+  const clearAllPdfsBtn = $('#clearAllPdfs'); 
+
+  const searchPdfs = $('#searchPdfs'); 
+
+  const pdfList = $('#pdfList'); 
+
+ 
+
+  let currentOffers = null; 
+
+  let savedCalculations = Storage.get('hsdSaved'); 
+
+ 
+
+  // Renovation matrix 
+
+  const renovationCosts = { 
+
+    "2 bed flat":      { Kitchen:5000, Bathroom:1500, Redecoration:1000, Roof:null, Rewire:1500, Windows:1000, Boiler:1000, Garden:null }, 
+
+    "2 bed terrace":   { Kitchen:5000, Bathroom:1500, Redecoration:850,  Roof:2500, Rewire:1500, Windows:1000, Boiler:1000, Garden:500 }, 
+
+    "3 bed semi":      { Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 }, 
+
+    "4 bed detached":  { Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 }, 
+
+    "4 bed townhouse": { Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 }, 
+
+    "3 bed end terrace":{Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 }, 
+
+    "3 bed bungalow":  { Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 } 
+
+  }; 
+
+ 
+
+  // Money formatting (commas) for inputs 
+
+  function formatMoneyInput(el){ 
+
+    if(!el) return; 
+
+    el.addEventListener('input', function(){ 
+
+      let val = this.value.replace(/,/g,''); 
+
+      if(val && !isNaN(val)){ 
+
+        this.value = parseInt(val,10).toLocaleString(); 
+
+      } else if(val === '') this.value = ''; 
+
+    }); 
+
+  } 
+
+  [ 
+
+    priceInput,'val_marketValue','val_spreadOffer','val_redemption', 
+
+    'val_requiredReneg','c1_listPrice','c1_soldPrice','c2_listPrice', 
+
+    'c2_soldPrice','c3_listPrice','c3_soldPrice' 
+
+  ].forEach(id=> formatMoneyInput(typeof id==='string' ? document.getElementById(id) : id)); 
+
+ 
+
+  function populateRenovations(){ 
+
+    const type = propertyTypeSelect.value; 
+
+    renovationOptionsDiv.innerHTML=''; 
+
+    if(!type) return; 
+
+    const costs = renovationCosts[type]; 
+
+    Object.keys(costs).forEach(item => { 
+
+      const cost = costs[item]; 
+
+      const disabled = cost === null ? 'disabled' : ''; 
+
+      const label = cost === null ? `${item} (N/A)` : `${item} (£${cost.toLocaleString()})`; 
+
+      const row = document.createElement('label'); 
+
+      row.innerHTML = `<input type="checkbox" value="${item}" ${disabled}> ${label}`; 
+
+      renovationOptionsDiv.appendChild(row); 
+
+    }); 
+
+  } 
+
+ 
+
+  propertyTypeSelect.addEventListener('change', ()=>{ 
+
+    const hasType = !!propertyTypeSelect.value; 
+
+    renovationSection.style.display = hasType ? 'block' : 'none'; 
+
+    renovationOptionsDiv.style.display = 'none'; 
+
+    if(hasType) populateRenovations(); 
+
+  }); 
+
+ 
+
+  $('#renovationSection').addEventListener('change', (e)=>{ 
+
+    if(e.target.name === 'includeRenov'){ 
+
+      renovationOptionsDiv.style.display = (e.target.value === 'yes') ? 'grid' : 'none'; 
+
+    } 
+
+    calculateOffer(); 
+
+  }); 
+
+ 
+
+  function calculateOffer(){ 
+
+    const rawPrice = priceInput.value.replace(/,/g,''); 
+
+    const listedPrice = parseFloat(rawPrice); 
+
+    if(isNaN(listedPrice)){ 
+
+      resultDiv.textContent = 'Enter a valid listed price.'; 
+
+      return; 
+
+    } 
+
+    const days = parseInt(daysSelect.value,10); 
+
+    const spread = getSpread(listedPrice); 
+
+ 
+
+    let baseBottom, baseTop; 
+
+    if(days === 180){ 
+
+      baseTop = listedPrice * 0.95;               // Top end fixed at 95% 
+
+      baseBottom = baseTop - spread;              // Bottom = 95% - spread 
+
+    } else if(days === 90){ 
+
+      baseBottom = listedPrice * 0.90;            // Bottom fixed at 90% 
+
+      baseTop = baseBottom + spread;              // Top = 90% + spread 
+
+    } else if(days === 30){ 
+
+      baseBottom = listedPrice * 0.80;            // Bottom fixed at 80% 
+
+      baseTop = baseBottom + spread; 
+
+    } else { // 7 days 
+
+      baseBottom = listedPrice * 0.70;            // Bottom fixed at 70% 
+
+      baseTop = baseBottom + spread; 
+
+    } 
+
+ 
+
+    // Round to nearest £1,000 
+
+    let bottomOffer = roundToNearestThousand(baseBottom); 
+
+    let topOffer = roundToNearestThousand(baseTop); 
+
+    if(bottomOffer < 0) bottomOffer = 0; 
+
+    if(topOffer < 0) topOffer = 0; 
+
+ 
+
+    // Renovations 
+
+    const type = propertyTypeSelect.value; 
+
+    const includeRenov = document.querySelector('input[name="includeRenov"]:checked')?.value === 'yes'; 
+
+    let selectedRenov = []; 
+
+    let totalRenovation = 0; 
+
+    if(type && includeRenov){ 
+
+      selectedRenov = [...renovationOptionsDiv.querySelectorAll('input:checked')].map(cb => cb.value); 
+
+      selectedRenov.forEach(item => { totalRenovation += renovationCosts[type][item] || 0; }); 
+
+    } 
+
+ 
+
+    const adjBottom = Math.max(0, roundToNearestThousand(bottomOffer - totalRenovation)); 
+
+    const adjTop = Math.max(0, roundToNearestThousand(topOffer - totalRenovation)); 
+
+    currentOffers = { bottom:bottomOffer, top:topOffer, adjBottom, adjTop, renovations:selectedRenov }; 
+
+ 
+
+    const adjClass = adjBottom >= bottomOffer ? 'adjusted-green' : 'adjusted-red'; 
+
+    resultDiv.innerHTML = ` 
+
+      <div class="original-offer">Original Offer: £${bottomOffer.toLocaleString()} - £${topOffer.toLocaleString()}</div> 
+
+      ${ totalRenovation>0 ? `<div>Renovation Costs: £${totalRenovation.toLocaleString()}</div>` : ''} 
+
+      <div class="adjusted-offer ${adjClass}">Adjusted Offer: £${adjBottom.toLocaleString()} - £${adjTop.toLocaleString()}</div> 
+
+    `; 
+
+  } 
+
+ 
+
+  calculateBtn.addEventListener('click', calculateOffer); 
+
+  priceInput.addEventListener('keypress', e=>{ if(e.key==='Enter') calculateOffer(); }); 
+
+  clearBtn.addEventListener('click', ()=>{ 
+
+    if(!confirm('Clear current inputs?')) return; 
+
+    customerInput.value=''; priceInput.value=''; daysSelect.value='7'; 
+
+    propertyTypeSelect.value=''; renovationSection.style.display='none'; 
+
+    resultDiv.textContent=''; renovationOptionsDiv.innerHTML=''; currentOffers=null; 
+
+  }); 
+
+ 
+
+  // ----- Saved Calculations ----- 
+
+  function renderSavedCalc(){ 
+
+    const searchTerm = (searchCalc.value || '').toLowerCase(); 
+
+    savedCalcList.innerHTML = ''; 
+
+    savedCalculations.forEach((entry, index)=>{ 
+
+      if(entry.name.toLowerCase().includes(searchTerm)){ 
+
+        const div = document.createElement('div'); div.className='saved-entry'; 
+
+        div.innerHTML = ` 
+
+          <div style="background:var(--chip);padding:6px;border-radius:8px;margin-bottom:4px;"><strong>${entry.name}</strong> | ${entry.propertyType || '—'}</div> 
+
+          <div style="background:#d0e5ff;padding:6px;border-radius:8px;">Original: £${entry.originalOffer.bottom.toLocaleString()} - £${entry.originalOffer.top.toLocaleString()}</div> 
+
+          <div style="background:${entry.adjustedOffer.bottom >= entry.originalOffer.bottom ? 'var(--good)' : 'var(--bad)'};padding:6px;border-radius:8px;margin-top:4px">Adjusted: £${entry.adjustedOffer.bottom.toLocaleString()} - £${entry.adjustedOffer.top.toLocaleString()}</div> 
+
+          <small style="opacity:.8">Saved: ${entry.timestamp}</small> 
+
+          <button class="del-btn" title="Delete">Del</button> 
+
+        `; 
+
+        div.querySelector('.del-btn').addEventListener('click', (ev)=>{ 
+
+          ev.stopPropagation(); 
+
+          if(!confirm('Delete this saved calculation?')) return; 
+
+          savedCalculations.splice(index,1); 
+
+          Storage.set('hsdSaved', savedCalculations); 
+
+          renderSavedCalc(); 
+
+          showToast('Deleted'); 
+
+        }); 
+
+        savedCalcList.appendChild(div); 
+
+      } 
+
+    }); 
+
+  } 
+
+ 
+
+  saveBtn.addEventListener('click', ()=>{ 
+
+    if(!customerInput.value.trim()){ return showToast('Enter customer name first'); } 
+
+    if(!currentOffers){ return showToast('Calculate offer first'); } 
+
+    const entry = { 
+
+      name: customerInput.value.trim(), 
+
+      listedPrice: priceInput.value, 
+
+      timeframe: daysSelect.value, 
+
+      propertyType: propertyTypeSelect.value, 
+
+      renovations: currentOffers.renovations, 
+
+      originalOffer: { bottom: currentOffers.bottom, top: currentOffers.top }, 
+
+      adjustedOffer: { bottom: currentOffers.adjBottom, top: currentOffers.adjTop }, 
+
+      timestamp: new Date().toLocaleString() 
+
+    }; 
+
+    savedCalculations.push(entry); 
+
+    Storage.set('hsdSaved', savedCalculations); 
+
+    renderSavedCalc(); 
+
+    showToast('Saved calculation'); 
+
+  }); 
+
+ 
+
+  searchCalc.addEventListener('input', debounce(renderSavedCalc, 160)); 
+
+  clearAllCalc.addEventListener('click', ()=>{ 
+
+    if(!savedCalculations.length) return showToast('Nothing to clear'); 
+
+    if(!confirm('Clear ALL saved calculations?')) return; 
+
+    savedCalculations = []; 
+
+    Storage.set('hsdSaved', savedCalculations); 
+
+    renderSavedCalc(); 
+
+    showToast('All calculations cleared'); 
+
+  }); 
+
+  renderSavedCalc(); 
+
+ 
+
+  // ----- Tabs: expand sidebar on Valuations ----- 
+
+  const tabBtns = $$('.tab-btn'); 
+
+  const tabSections = $$('.tab-section'); 
+
+  tabBtns.forEach(btn=>{ 
+
+    btn.addEventListener('click', ()=>{ 
+
+      tabBtns.forEach(b=>b.classList.remove('active')); 
+
+      btn.classList.add('active'); 
+
+      tabSections.forEach(sec=>sec.style.display='none'); 
+
+      document.getElementById(btn.dataset.tab).style.display='block'; 
+
+      if(btn.dataset.tab === 'valuations'){ sidebar.classList.add('wide'); } 
+
+      else { sidebar.classList.remove('wide'); } 
+
+    }); 
+
+  }); 
+
+ 
+
+  // Overlay (text) 
+
+  closeOverlay.addEventListener('click', ()=>{ overlay.style.display='none'; }); 
+
+  copyOverlay.addEventListener('click', ()=>{ 
+
+    navigator.clipboard.writeText(overlayText.innerText || ''); 
+
+    showToast('Copied'); 
+
+  }); 
+
+ 
+
+  // ----- Overlay helpers for objections (unchanged) ----- 
+
+  function setupOverlay(storageKey, titleInputId, contentInputId, listId, saveBtnId, searchId){ 
+
+    const listDiv = document.getElementById(listId); 
+
+    const titleInput = document.getElementById(titleInputId); 
+
+    const contentInput = document.getElementById(contentInputId); 
+
+    const saveButton = document.getElementById(saveBtnId); 
+
+    const searchInput = document.getElementById(searchId); 
+
+    let items = Storage.get(storageKey); 
+
+ 
+
+    function render(){ 
+
+      const search = (searchInput?.value || '').toLowerCase(); 
+
+      listDiv.innerHTML=''; 
+
+      items.forEach((e,i)=>{ 
+
+        if(!search || e.title.toLowerCase().includes(search)){ 
+
+          const div = document.createElement('div'); div.className='saved-entry'; 
+
+          div.innerHTML = `${e.title} 
+
+            <button class="del-btn">Del</button> 
+
+            <button class="copy-btn">Copy</button>`; 
+
+          div.querySelector('.del-btn').addEventListener('click', (ev)=>{ 
+
+            ev.stopPropagation(); 
+
+            if(!confirm('Delete this item?')) return; 
+
+            items.splice(i,1); Storage.set(storageKey, items); render(); showToast('Deleted'); 
+
+          }); 
+
+          div.querySelector('.copy-btn').addEventListener('click', (ev)=>{ 
+
+            ev.stopPropagation(); 
+
+            navigator.clipboard.writeText(e.script || e.content || ''); 
+
+            showToast('Copied'); 
+
+          }); 
+
+          div.addEventListener('click',()=>{ 
+
+            overlayTitle.innerText = e.title; 
+
+            overlayText.innerText = e.script || e.content || ''; 
+
+            overlay.style.display='flex'; 
+
+          }); 
+
+          listDiv.appendChild(div); 
+
+        } 
+
+      }); 
+
+    } 
+
+ 
+
+    saveButton.addEventListener('click', ()=>{ 
+
+      if(!titleInput.value.trim() || !contentInput.value.trim()){ return showToast('Enter title & content'); } 
+
+      items.push({ title:titleInput.value.trim(), script:contentInput.value.trim(), content:contentInput.value.trim() }); 
+
+      Storage.set(storageKey, items); 
+
+      titleInput.value = ''; contentInput.value=''; 
+
+      render(); showToast('Saved'); 
+
+    }); 
+
+ 
+
+    searchInput && searchInput.addEventListener('input', debounce(render, 160)); 
+
+    render(); 
+
+  } 
+
+ 
+
+  setupOverlay('objections','newObjTitle','newObjContent','objList','saveObj','searchObj'); 
+
+ 
+
+  // ----- Templates (emails, sms) ----- 
+
+  function setupTemplate(storageKey, titleId, contentId, listId, saveBtnId, searchId, clearId){ 
+
+    let items = Storage.get(storageKey); 
+
+    const titleInput = document.getElementById(titleId); 
+
+    const contentInput = document.getElementById(contentId); 
+
+    const listDiv = document.getElementById(listId); 
+
+    const saveButton = document.getElementById(saveBtnId); 
+
+    const searchInput = document.getElementById(searchId); 
+
+    const clearButton = document.getElementById(clearId); 
+
+ 
+
+    function render(){ 
+
+      const search = (searchInput.value || '').toLowerCase(); 
+
+      listDiv.innerHTML=''; 
+
+      items.forEach((e,i)=>{ 
+
+        if(e.title.toLowerCase().includes(search)){ 
+
+          const div = document.createElement('div'); div.className='saved-entry'; 
+
+          div.innerHTML = `${e.title} 
+
+            <button class="copy-btn">Copy</button> 
+
+            <button class="del-btn">Del</button>`; 
+
+          div.querySelector('.copy-btn').addEventListener('click', ()=>{ 
+
+            navigator.clipboard.writeText(e.content || ''); 
+
+            showToast('Copied'); 
+
+          }); 
+
+          div.querySelector('.del-btn').addEventListener('click', ()=>{ 
+
+            if(!confirm('Delete this item?')) return; 
+
+            items.splice(i,1); Storage.set(storageKey, items); render(); showToast('Deleted'); 
+
+          }); 
+
+          listDiv.appendChild(div); 
+
+        } 
+
+      }); 
+
+    } 
+
+ 
+
+    saveButton.addEventListener('click', ()=>{ 
+
+      if(!titleInput.value.trim() || !contentInput.value.trim()){ return showToast('Enter title & content'); } 
+
+      items.push({ title:titleInput.value.trim(), content:contentInput.value.trim() }); 
+
+      Storage.set(storageKey, items); 
+
+      titleInput.value=''; contentInput.value=''; 
+
+      render(); showToast('Saved'); 
+
+    }); 
+
+ 
+
+    searchInput.addEventListener('input', debounce(render, 160)); 
+
+    clearButton.addEventListener('click', ()=>{ 
+
+      if(!items.length) return showToast('Nothing to clear'); 
+
+      if(!confirm(`Clear ALL ${storageKey} items?`)) return; 
+
+      items=[]; Storage.set(storageKey, items); render(); showToast('Cleared'); 
+
+    }); 
+
+    render(); 
+
+  } 
+
+ 
+
+  setupTemplate('emails','newEmailTitle','newEmailContent','emailList','saveEmail','searchEmail','clearAllEmails'); 
+
+  setupTemplate('smsTemplates','newSMSTitle','newSMSContent','smsList','saveSMS','searchSMS','clearAllSMS'); 
+
+ 
+
+  // ---------- Valuations: Save/List/View ---------- 
+
+  const valuationFields = [ 
+
+    'val_customerName','val_address1','val_postcode','val_marketValue','val_spreadOffer','val_redemption','val_days','val_requiredReneg','val_justification', 
+
+    'c1_url','c1_address','c1_agent','c1_dates','c1_listPrice','c1_reductions','c1_sqft','c1_agentNotes','c1_soldPrice','c1_offerDate','c1_viewings','c1_offers','c1_eaOpinion', 
+
+    'c2_url','c2_address','c2_agent','c2_dates','c2_listPrice','c2_reductions','c2_sqft','c2_agentNotes','c2_soldPrice','c2_offerDate','c2_viewings','c2_offers','c2_eaOpinion', 
+
+    'c3_url','c3_address','c3_agent','c3_dates','c3_listPrice','c3_reductions','c3_sqft','c3_agentNotes','c3_soldPrice','c3_offerDate','c3_viewings','c3_offers','c3_eaOpinion' 
+
+  ]; 
+
+ 
+
+  const valSearch = $('#valSearch'); 
+
+  const valuationList = $('#valuationList'); 
+
+  const saveValuationBtn = $('#saveValuation'); 
+
+  const clearAllValuationsBtn = $('#clearAllValuations'); 
+
+  const clearValuationFormBtn = $('#clearValuationForm'); 
+
+ 
+
+  let valuations = Storage.get('valuations'); 
+
+ 
+
+  function getValuationFromForm(){ 
+
+    const obj = {}; 
+
+    valuationFields.forEach(id => { 
+
+      const el = document.getElementById(id); 
+
+      obj[id] = el ? el.value.trim() : ''; 
+
+    }); 
+
+    obj.timestamp = new Date().toLocaleString(); 
+
+    return obj; 
+
+  } 
+
+ 
+
+  function clearValuationForm(){ 
+
+    valuationFields.forEach(id => { 
+
+      const el = document.getElementById(id); 
+
+      if(el) el.value = ''; 
+
+    }); 
+
+    showToast('Valuation form cleared'); 
+
+  } 
+
+  clearValuationFormBtn.addEventListener('click', clearValuationForm); 
+
+ 
+
+  function valuationToPrettyText(v){ 
+
+    const line = (label, key) => `${label}: ${v[key] || ''}`; 
+
+    return [ 
+
+      'VALUATION CHECKLIST', 
+
+      line('Customer Name','val_customerName'), 
+
+      line('First Line of Address','val_address1'), 
+
+      line('Postcode','val_postcode'), 
+
+      '', 
+
+      line('Market Value / Listed Price','val_marketValue'), 
+
+      line('Spread Offer Agreed','val_spreadOffer'), 
+
+      line('Redemption Figure','val_redemption'), 
+
+      line('Valuation Days','val_days'), 
+
+      line('Required Reneg','val_requiredReneg'), 
+
+      '', 
+
+      'My Valuation / Justification:', 
+
+      v['val_justification'] || '', 
+
+      '', 
+
+      'COMPARABLE 1', 
+
+      line('URL','c1_url'), 
+
+      line('Property Address','c1_address'), 
+
+      line('Estate Agent','c1_agent'), 
+
+      line('Listing Date (start–end)','c1_dates'), 
+
+      line('Listing Price','c1_listPrice'), 
+
+      line('Price Reductions','c1_reductions'), 
+
+      line('Square Footage','c1_sqft'), 
+
+      line('Estate Agent Notes','c1_agentNotes'), 
+
+      line('Sold Price','c1_soldPrice'), 
+
+      line('Date Offer Accepted','c1_offerDate'), 
+
+      line('Number of Viewings','c1_viewings'), 
+
+      line('Number of Offers','c1_offers'), 
+
+      line('EA Opinion — Our Subject','c1_eaOpinion'), 
+
+      '', 
+
+      'COMPARABLE 2', 
+
+      line('URL','c2_url'), 
+
+      line('Property Address','c2_address'), 
+
+      line('Estate Agent','c2_agent'), 
+
+      line('Listing Date (start–end)','c2_dates'), 
+
+      line('Listing Price','c2_listPrice'), 
+
+      line('Price Reductions','c2_reductions'), 
+
+      line('Square Footage','c2_sqft'), 
+
+      line('Estate Agent Notes','c2_agentNotes'), 
+
+      line('Sold Price','c2_soldPrice'), 
+
+      line('Date Offer Accepted','c2_offerDate'), 
+
+      line('Number of Viewings','c2_viewings'), 
+
+      line('Number of Offers','c2_offers'), 
+
+      line('EA Opinion — Our Subject','c2_eaOpinion'), 
+
+      '', 
+
+      'COMPARABLE 3', 
+
+      line('URL','c3_url'), 
+
+      line('Property Address','c3_address'), 
+
+      line('Estate Agent','c3_agent'), 
+
+      line('Listing Date (start–end)','c3_dates'), 
+
+      line('Listing Price','c3_listPrice'), 
+
+      line('Price Reductions','c3_reductions'), 
+
+      line('Square Footage','c3_sqft'), 
+
+      line('Estate Agent Notes','c3_agentNotes'), 
+
+      line('Sold Price','c3_soldPrice'), 
+
+      line('Date Offer Accepted','c3_offerDate'), 
+
+      line('Number of Viewings','c3_viewings'), 
+
+      line('Number of Offers','c3_offers'), 
+
+      line('EA Opinion — Our Subject','c3_eaOpinion'), 
+
+    ].join('\n\n'); 
+
+  } 
+
+ 
+
+  function renderValuations(){ 
+
+    const search = (valSearch.value || '').toLowerCase(); 
+
+    valuationList.innerHTML = ''; 
+
+    valuations.forEach((v,i)=>{ 
+
+      const name = v['val_customerName'] || '(No name)'; 
+
+      const addr1 = v['val_address1'] || ''; 
+
+      const postcode = (v['val_postcode'] || '').toLowerCase(); 
+
+      if(!search || postcode.includes(search)){ 
+
+        const div = document.createElement('div'); 
+
+        div.className = 'saved-entry'; 
+
+        div.innerHTML = ` 
+
+          <div style="font-weight:600">${name} – ${addr1}</div> 
+
+          <small style="opacity:.8">${v.timestamp || ''}</small> 
+
+          <button class="del-btn">Del</button> 
+
+          <button class="copy-btn">Copy</button> 
+
+        `; 
+
+        div.addEventListener('click', (ev)=>{ 
+
+          if(ev.target.closest('button')) return; 
+
+          overlayTitle.innerText = name + ' — Valuation'; 
+
+          overlayText.innerText = valuationToPrettyText(v); 
+
+          overlay.style.display='flex'; 
+
+        }); 
+
+        div.querySelector('.copy-btn').addEventListener('click', (ev)=>{ 
+
+          ev.stopPropagation(); 
+
+          navigator.clipboard.writeText(valuationToPrettyText(v)); 
+
+          showToast('Valuation copied'); 
+
+        }); 
+
+        div.querySelector('.del-btn').addEventListener('click', (ev)=>{ 
+
+          ev.stopPropagation(); 
+
+          if(!confirm('Delete this valuation?')) return; 
+
+          valuations.splice(i,1); 
+
+          Storage.set('valuations', valuations); 
+
+          renderValuations(); 
+
+          showToast('Deleted'); 
+
+        }); 
+
+        valuationList.appendChild(div); 
+
+      } 
+
+    }); 
+
+  } 
+
+ 
+
+  // Save valuation 
+
+  saveValuationBtn.addEventListener('click', ()=>{ 
+
+    const v = getValuationFromForm(); 
+
+    if(!v.val_customerName){ 
+
+      return showToast('Add a Customer Name before saving'); 
+
+    } 
+
+    valuations.push(v); 
+
+    Storage.set('valuations', valuations); 
+
+    renderValuations(); 
+
+    showToast('Valuation saved'); 
+
+  }); 
+
+ 
+
+  valSearch.addEventListener('input', debounce(renderValuations, 160)); 
+
+  clearAllValuationsBtn.addEventListener('click', ()=>{ 
+
+    if(!valuations.length) return showToast('Nothing to clear'); 
+
+    if(!confirm('Clear ALL valuations?')) return; 
+
+    valuations = []; 
+
+    Storage.set('valuations', valuations); 
+
+    renderValuations(); 
+
+    showToast('All valuations cleared'); 
+
+  }); 
+
+  renderValuations(); 
+
+ 
+
+  // Export backup (includes valuations, not PDFs) 
+
+  exportBtn.addEventListener('click', ()=>{ 
+
+    const data = { 
+
+      hsdSaved: Storage.get('hsdSaved'), 
+
+      emails: Storage.get('emails'), 
+
+      smsTemplates: Storage.get('smsTemplates'), 
+
+      objections: Storage.get('objections'), 
+
+      scripts: Storage.get('scripts'), 
+
+      valuations: Storage.get('valuations') 
+
+    }; 
+
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'}); 
+
+    const a = document.createElement('a'); 
+
+    a.href = URL.createObjectURL(blob); 
+
+    a.download = 'HSD_Backup.json'; 
+
+    a.click(); 
+
+    URL.revokeObjectURL(a.href); 
+
+    showToast('Backup exported'); 
+
+  }); 
+
+ 
+
+  // Theme toggle 
+
+  const THEME_KEY = 'hsd_theme'; 
+
+  function setTheme(mode){ 
+
+    document.documentElement.setAttribute('data-theme', mode); 
+
+    localStorage.setItem(THEME_KEY, mode); 
+
+    themeToggle.textContent = mode === 'dark' ? '☀️' : '🌙'; 
+
+  } 
+
+  const savedTheme = localStorage.getItem(THEME_KEY) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); 
+
+  setTheme(savedTheme); 
+
+  themeToggle.addEventListener('click', ()=> setTheme(document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark')); 
+
+ 
+
+  // Collapsible logic: only one comparable open at a time 
+
+  const comps = ['comp1','comp2','comp3'].map(id=>document.getElementById(id)); 
+
+  comps.forEach(d=>{ 
+
+    d.addEventListener('toggle', ()=>{ 
+
+      if(d.open){ 
+
+        comps.forEach(other=>{ if(other!==d) other.removeAttribute('open'); }); 
+
+      } 
+
+    }); 
+
+  }); 
+
+ 
+
+  // ======= SCRIPTS - PDF STORAGE (IndexedDB) ======= 
+
+  const DB_NAME = 'hsd_pdf_db'; 
+
+  const DB_STORE = 'pdfs'; 
+
+  let db; 
+
+  function openDB(){ 
+
+    return new Promise((resolve, reject)=>{ 
+
+      const req = indexedDB.open(DB_NAME, 1); 
+
+      req.onupgradeneeded = (e)=>{ 
+
+        db = e.target.result; 
+
+        if(!db.objectStoreNames.contains(DB_STORE)){ 
+
+          db.createObjectStore(DB_STORE, { keyPath:'id', autoIncrement:true }); 
+
+        } 
+
+      }; 
+
+      req.onsuccess = (e)=>{ db = e.target.result; resolve(db); }; 
+
+      req.onerror = (e)=> reject(e); 
+
+    }); 
+
+  } 
+
+  async function dbAddPDF(name, blob){ 
+
+    await openDB(); 
+
+    return new Promise((resolve, reject)=>{ 
+
+      const tx = db.transaction(DB_STORE, 'readwrite'); 
+
+      const store = tx.objectStore(DB_STORE); 
+
+      const now = new Date().toISOString(); 
+
+      const req = store.add({ name, blob, createdAt: now }); 
+
+      req.onsuccess = ()=> resolve(req.result); 
+
+      req.onerror = (e)=> reject(e); 
+
+    }); 
+
+  } 
+
+  async function dbGetAllPDFs(){ 
+
+    await openDB(); 
+
+    return new Promise((resolve, reject)=>{ 
+
+      const tx = db.transaction(DB_STORE, 'readonly'); 
+
+      const store = tx.objectStore(DB_STORE); 
+
+      const req = store.getAll(); 
+
+      req.onsuccess = ()=> resolve(req.result || []); 
+
+      req.onerror = (e)=> reject(e); 
+
+    }); 
+
+  } 
+
+  async function dbDeletePDF(id){ 
+
+    await openDB(); 
+
+    return new Promise((resolve, reject)=>{ 
+
+      const tx = db.transaction(DB_STORE, 'readwrite'); 
+
+      const store = tx.objectStore(DB_STORE); 
+
+      const req = store.delete(id); 
+
+      req.onsuccess = ()=> resolve(); 
+
+      req.onerror = (e)=> reject(e); 
+
+    }); 
+
+  } 
+
+  // Render list 
+
+  async function renderPDFs(){ 
+
+    const search = (searchPdfs.value || '').toLowerCase(); 
+
+    const items = await dbGetAllPDFs(); 
+
+    pdfList.innerHTML = ''; 
+
+    items 
+
+      .filter(item => !search || item.name.toLowerCase().includes(search)) 
+
+      .forEach(item => { 
+
+        const div = document.createElement('div'); 
+
+        div.className = 'saved-entry'; 
+
+        div.innerHTML = ` 
+
+          <div style="font-weight:600">${item.name}</div> 
+
+          <small style="opacity:.8">${new Date(item.createdAt).toLocaleString()}</small> 
+
+          <button class="del-btn">Del</button> 
+
+        `; 
+
+        // Open viewer on click 
+
+        div.addEventListener('click', async (ev)=>{ 
+
+          if(ev.target.closest('button')) return; 
+
+          const blob = item.blob; 
+
+          const url = URL.createObjectURL(blob); 
+
+          pdfOverlayTitle.textContent = item.name; 
+
+          pdfOverlayFrame.src = url + '#view=FitH'; 
+
+          downloadPdfBtn.onclick = ()=>{ 
+
+            const a = document.createElement('a'); 
+
+            a.href = url; 
+
+            a.download = item.name || 'script.pdf'; 
+
+            a.click(); 
+
+          }; 
+
+          openPdfNewTabBtn.onclick = ()=> window.open(url, '_blank'); 
+
+          pdfOverlay.style.display = 'flex'; 
+
+        }); 
+
+        // delete button 
+
+        div.querySelector('.del-btn').addEventListener('click', async (ev)=>{ 
+
+          ev.stopPropagation(); 
+
+          if(!confirm('Delete this PDF?')) return; 
+
+          await dbDeletePDF(item.id); 
+
+          renderPDFs(); 
+
+          showToast('PDF deleted'); 
+
+        }); 
+
+        pdfList.appendChild(div); 
+
+      }); 
+
+  } 
+
+  // Upload 
+
+  uploadPdfBtn.addEventListener('click', ()=> pdfInput.click()); 
+
+  pdfInput.addEventListener('change', async ()=>{ 
+
+    const files = Array.from(pdfInput.files || []); 
+
+    if(!files.length) return; 
+
+    for(const f of files){ 
+
+      if(f.type !== 'application/pdf'){ showToast('Only PDF files allowed'); continue; } 
+
+      // simple size guard (100MB per file likely excessive; adjust if needed) 
+
+      if(f.size > 100 * 1024 * 1024){ showToast('PDF too large (>100MB)'); continue; } 
+
+      await dbAddPDF(f.name, f); 
+
+    } 
+
+    pdfInput.value = ''; 
+
+    await renderPDFs(); 
+
+    showToast('PDF(s) uploaded'); 
+
+  }); 
+
+  clearAllPdfsBtn.addEventListener('click', async ()=>{ 
+
+    if(!confirm('Clear ALL uploaded PDFs?')) return; 
+
+    await openDB(); 
+
+    const tx = db.transaction(DB_STORE, 'readwrite'); 
+
+    tx.objectStore(DB_STORE).clear(); 
+
+    tx.oncomplete = ()=>{ renderPDFs(); showToast('All PDFs cleared'); }; 
+
+  }); 
+
+  closePdfOverlay.addEventListener('click', ()=>{ 
+
+    pdfOverlayFrame.src = 'about:blank'; 
+
+    pdfOverlay.style.display = 'none'; 
+
+  }); 
+
+  searchPdfs.addEventListener('input', debounce(renderPDFs, 150)); 
+
+  renderPDFs(); 
+
+ 
+
+})();</script> 
+
+</body> 
+
+</html> 
