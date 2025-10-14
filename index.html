@@ -268,7 +268,15 @@
 
     <h2>HSD Offer Calculator</h2> 
 
- 
+ <div id="authBox" class="stack" style="margin:12px 0">
+  <input type="email" id="loginEmail" placeholder="Work email (magic link)">
+  <div class="button-group">
+    <button id="loginBtn">Send login link</button>
+    <button id="logoutBtn" class="ghost">Sign out</button>
+  </div>
+  <small id="whoami" style="opacity:.8">Not signed in</small>
+</div>
+
 
     <label for="customerName">Customer Name</label> 
 
@@ -810,7 +818,73 @@
 
 </div> 
 
- 
+ <!-- Supabase client + tiny backend adapter -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // 1) Fill these with your Supabase project values
+  const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs"; // ok to expose; RLS protects data
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // 2) Minimal backend adapter for CALCULATIONS (we’ll do other tabs later)
+  const Backend = {
+    async user() {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user;
+    },
+    async signIn(email) {
+      const { error } = await supabase.auth.signInWithOtp({ email });
+      if (error) throw error;
+      return true;
+    },
+    async listCalculations() {
+      const { data, error } = await supabase
+        .from('calculations')
+        .select('id, data')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    async saveCalculation(entry) {
+      const u = await this.user(); if (!u) throw new Error("Sign in first");
+      const row = { user_id: u.id, data: entry };
+      const { error } = await supabase.from('calculations').insert(row);
+      if (error) throw error;
+    },
+    async deleteCalculation(id) {
+      const { error } = await supabase.from('calculations').delete().eq('id', id);
+      if (error) throw error;
+    }
+  };
+</script>
+
+<!-- Auth wiring (runs after DOM exists) -->
+<script>
+  (async function () {
+    const email = document.getElementById('loginEmail');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const whoami = document.getElementById('whoami');
+
+    async function refreshWho() {
+      const u = await Backend.user();
+      whoami && (whoami.textContent = u ? `Signed in as ${u.email}` : 'Not signed in');
+    }
+
+    loginBtn && (loginBtn.onclick = async () => {
+      if (!email.value) return alert('Enter your email');
+      await Backend.signIn(email.value);
+      alert('Check your inbox for a magic link');
+    });
+
+    logoutBtn && (logoutBtn.onclick = async () => { await supabase.auth.signOut(); });
+
+    await refreshWho();
+    supabase.auth.onAuthStateChange(refreshWho);
+  })();
+</script>
+
 
 <script> 
 
@@ -948,7 +1022,27 @@
 
   let currentOffers = null; 
 
-  let savedCalculations = Storage.get('hsdSaved'); 
+  let savedCalculations = []; // hydrate from cloud or local fallback
+
+  async function syncCalcsFromCloud(){
+  try {
+    const user = await Backend.user();
+    if (user) {
+      const rows = await Backend.listCalculations();
+      savedCalculations = rows.map(r => ({ ...r.data, id: r.id })); // keep DB id
+    } else {
+      savedCalculations = Storage.get('hsdSaved') || []; // fallback when signed out
+    }
+    renderSavedCalc();
+  } catch (e) {
+    console.error(e);
+    showToast('Could not sync from cloud');
+    savedCalculations = Storage.get('hsdSaved') || [];
+    renderSavedCalc();
+  }
+}
+
+ 
 
  
 
@@ -1222,7 +1316,28 @@
 
           if(!confirm('Delete this saved calculation?')) return; 
 
-          savedCalculations.splice(index,1); 
+          div.querySelector('.del-btn').addEventListener('click', async (ev)=>{
+  ev.stopPropagation();
+  if(!confirm('Delete this saved calculation?')) return;
+
+  const entry = savedCalculations[index];
+  try {
+    if (entry.id) { // cloud row
+      await Backend.deleteCalculation(entry.id);
+      showToast('Deleted from cloud');
+      await syncCalcsFromCloud();
+    } else {
+      savedCalculations.splice(index,1);
+      Storage.set('hsdSaved', savedCalculations);
+      renderSavedCalc();
+      showToast('Deleted locally');
+    }
+  } catch (e) {
+    console.error(e);
+    showToast('Delete failed');
+  }
+});
+ 
 
           Storage.set('hsdSaved', savedCalculations); 
 
@@ -1242,31 +1357,44 @@
 
  
 
-  saveBtn.addEventListener('click', ()=>{ 
+ saveBtn.addEventListener('click', async ()=>{ 
+  if(!customerInput.value.trim()){ return showToast('Enter customer name first'); } 
+  if(!currentOffers){ return showToast('Calculate offer first'); } 
 
-    if(!customerInput.value.trim()){ return showToast('Enter customer name first'); } 
+  const entry = { 
+    name: customerInput.value.trim(), 
+    listedPrice: priceInput.value, 
+    timeframe: daysSelect.value, 
+    propertyType: propertyTypeSelect.value, 
+    renovations: currentOffers.renovations, 
+    originalOffer: { bottom: currentOffers.bottom, top: currentOffers.top }, 
+    adjustedOffer: { bottom: currentOffers.adjBottom, top: currentOffers.adjTop }, 
+    timestamp: new Date().toLocaleString() 
+  };
 
-    if(!currentOffers){ return showToast('Calculate offer first'); } 
+  const user = await Backend.user();
+  if (user){
+    try {
+      await Backend.saveCalculation(entry);
+      showToast('Saved to cloud');
+      await syncCalcsFromCloud();
+    } catch(e){
+      console.error(e);
+      showToast('Cloud save failed — saved locally instead');
+      const local = Storage.get('hsdSaved') || [];
+      local.push(entry);
+      Storage.set('hsdSaved', local);
+      savedCalculations = local;
+      renderSavedCalc();
+    }
+  } else {
+    savedCalculations.push(entry); 
+    Storage.set('hsdSaved', savedCalculations); 
+    renderSavedCalc(); 
+    showToast('Saved locally');
+  }
+});
 
-    const entry = { 
-
-      name: customerInput.value.trim(), 
-
-      listedPrice: priceInput.value, 
-
-      timeframe: daysSelect.value, 
-
-      propertyType: propertyTypeSelect.value, 
-
-      renovations: currentOffers.renovations, 
-
-      originalOffer: { bottom: currentOffers.bottom, top: currentOffers.top }, 
-
-      adjustedOffer: { bottom: currentOffers.adjBottom, top: currentOffers.adjTop }, 
-
-      timestamp: new Date().toLocaleString() 
-
-    }; 
 
     savedCalculations.push(entry); 
 
@@ -1298,7 +1426,8 @@
 
   }); 
 
-  renderSavedCalc(); 
+  syncCalcsFromCloud();
+ 
 
  
 
