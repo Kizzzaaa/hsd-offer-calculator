@@ -269,13 +269,16 @@
     <h2>HSD Offer Calculator</h2> 
 
  <div id="authBox" class="stack" style="margin:12px 0">
-  <input type="email" id="loginEmail" placeholder="Work email (magic link)">
+  <input type="email" id="authEmail" placeholder="Email">
+  <input type="password" id="authPassword" placeholder="Password">
   <div class="button-group">
-    <button id="loginBtn">Send login link</button>
+    <button id="signupBtn" class="ghost">Create account</button>
+    <button id="signinBtn">Sign in</button>
     <button id="logoutBtn" class="ghost">Sign out</button>
   </div>
   <small id="whoami" style="opacity:.8">Not signed in</small>
 </div>
+
 
 
     <label for="customerName">Customer Name</label> 
@@ -862,28 +865,77 @@
 <!-- Auth wiring (runs after DOM exists) -->
 <script>
   (async function () {
-    const email = document.getElementById('loginEmail');
-    const loginBtn = document.getElementById('loginBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
     const whoami = document.getElementById('whoami');
+    const email = document.getElementById('authEmail');
+    const password = document.getElementById('authPassword');
+    const signupBtn = document.getElementById('signupBtn');
+    const signinBtn = document.getElementById('signinBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
 
     async function refreshWho() {
       const u = await Backend.user();
-      whoami && (whoami.textContent = u ? `Signed in as ${u.email}` : 'Not signed in');
+      whoami.textContent = u ? `Signed in as ${u.email}` : 'Not signed in';
     }
 
-    loginBtn && (loginBtn.onclick = async () => {
-      if (!email.value) return alert('Enter your email');
-      await Backend.signIn(email.value);
-      alert('Check your inbox for a magic link');
-    });
+    signupBtn.onclick = async () => {
+      if (!email.value || !password.value) return alert('Enter email & password');
+      try {
+        await Backend.signUp(email.value, password.value);
+        alert('Account created. Check your email if confirmation is required.');
+      } catch (e) {
+        alert(e.message || 'Sign-up failed');
+      }
+    };
 
-    logoutBtn && (logoutBtn.onclick = async () => { await supabase.auth.signOut(); });
+    signinBtn.onclick = async () => {
+      if (!email.value || !password.value) return alert('Enter email & password');
+      try {
+        await Backend.signIn(email.value, password.value);
+      } catch (e) {
+        alert(e.message || 'Sign-in failed');
+      }
+    };
+
+    logoutBtn.onclick = async () => { await Backend.signOut(); };
 
     await refreshWho();
-    supabase.auth.onAuthStateChange(refreshWho);
+
+    // On any auth change → refresh identity + migrate/sync calculations
+    supabase.auth.onAuthStateChange(async () => {
+      await refreshWho();
+      if (window.migrateLocalCalcsToCloudIfNeeded) {
+        await window.migrateLocalCalcsToCloudIfNeeded();
+      }
+      if (window.syncCalcsFromCloud) {
+        await window.syncCalcsFromCloud();
+      }
+    });
   })();
 </script>
+
+<div class="button-group" style="margin-top:8px">
+  <button id="loginGoogle">Continue with Google</button>
+  <button id="loginMicrosoft">Continue with Microsoft</button>
+</div>
+
+<script>
+  (function () {
+    const g = document.getElementById('loginGoogle');
+    const m = document.getElementById('loginMicrosoft');
+    async function social(provider){
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: window.location.origin }
+      });
+      if (error) alert(error.message);
+    }
+    g && (g.onclick = ()=> social('google'));
+    m && (m.onclick = ()=> social('azure'));
+  })();
+</script>
+
+
+
 
 
 <script> 
