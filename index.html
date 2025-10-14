@@ -20,18 +20,30 @@
   }
   *{box-sizing:border-box}
   html,body{height:100%}
-  body {
+  body{
     font-family:'Poppins',sans-serif; background:var(--bg); color:var(--ink);
     margin:0; display:flex; justify-content:center; align-items:flex-start; padding:20px;
   }
   a{color:var(--brand)}
   .flex-container{display:flex;gap:30px;max-width:1800px;width:100%;align-items:flex-start}
   .stack{display:flex;flex-direction:column;gap:12px}
+
   .calculator,.sidebar{
     background:var(--card); padding:24px; border-radius:16px; box-shadow:0 15px 30px rgba(0,0,0,0.10);
   }
   .calculator{width:640px;position:relative}
-  h2{margin:0 0 16px;font-size:28px;color:var(--brand);text-align:center}
+
+  /* Top brand header inside calculator */
+  .calc-header{
+    display:flex; align-items:center; gap:14px; margin:0 0 18px 0; padding-bottom:10px; border-bottom:1px solid var(--border);
+  }
+  .calc-logo{
+    height:40px; width:auto; display:block; object-fit:contain;
+  }
+  .calc-title{
+    font-size:28px; color:var(--brand); margin:0;
+  }
+
   label{display:block;margin-bottom:6px;font-weight:600;color:var(--muted)}
   input,select,textarea,button{font-family:'Poppins',sans-serif;font-size:16px}
   input,select,textarea{
@@ -47,28 +59,24 @@
   button:hover{background:var(--brand-700);transform:translateY(-1px)}
   button.secondary{background:#94a3b8;color:#0b1020}
   button.ghost{background:transparent;border:1px solid var(--border);color:var(--ink)}
+
   .result-card{margin-top:18px;padding:16px;border-radius:12px;background:var(--soft);font-size:18px;font-weight:600}
   .original-offer{background:var(--chip);color:var(--brand);padding:8px;border-radius:8px;margin-bottom:6px}
   .adjusted-offer{padding:8px;border-radius:8px;font-weight:700}
   .adjusted-green{background:var(--good)}
   .adjusted-red{background:var(--bad)}
+
   .renovation-section{margin-top:14px}
   .renovation-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
   .renovation-options label{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer}
   .renovation-options input[type="checkbox"]{width:18px;height:18px;accent-color:var(--brand)}
+
   .sidebar{flex:1;display:flex;flex-direction:column;max-height:900px;position:sticky;top:20px;min-width:520px;transition:width .25s ease,max-width .25s ease}
   .sidebar.wide{min-width:960px;max-width:1200px;width:100%}
-
   .sidebar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;position:relative}
   .sidebar-header h2{font-size:22px;color:var(--brand);margin:0}
-  .sidebar-brand { display:flex; align-items:center; gap:12px }
-  .sidebar-logo { height:32px; width:auto; display:block; object-fit:contain }
-  .sidebar-header::after {
-    content:""; position:absolute; left:0; right:0; bottom:-8px; height:1px; background:var(--border); opacity:.6;
-  }
+  .sidebar-header::after{content:"";display:block;position:absolute;left:0;right:0;height:1px;background:var(--border);bottom:-8px;opacity:.6}
 
-  .export-btn{background:transparent;border:none;cursor:pointer;font-size:16px;color:var(--brand);opacity:0.8;transition:.2s;padding:6px;border-radius:8px}
-  .export-btn:hover{opacity:1;transform:scale(1.06);background:var(--soft)}
   .tab-buttons{display:flex;gap:8px;background:var(--chip);border-radius:12px;padding:6px;flex-wrap:wrap}
   .tab-buttons button{flex:1;border-radius:10px;margin:0;background:transparent;color:var(--ink);min-width:140px}
   .tab-buttons button.active{background:var(--brand);color:#fff}
@@ -78,6 +86,7 @@
   .saved-entry button{position:absolute;top:6px;padding:4px 8px;font-size:12px;border-radius:6px}
   .saved-entry .del-btn{background:#ef4444;color:#fff;right:6px}
   .saved-entry .copy-btn{background:var(--brand);color:#fff;right:62px}
+
   .v-section{background:var(--soft);border:1px solid var(--border);padding:18px;border-radius:12px;margin:14px 0}
   .v-title{margin:0 0 12px;font-size:20px;color:var(--brand)}
   .v-field{margin-bottom:14px}
@@ -87,6 +96,7 @@
   .caret{transition:transform .2s ease}
   .collapsible[open] .caret{transform:rotate(180deg)}
   .collapsible .content{padding:16px}
+
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.35);z-index:2000;opacity:.98}
   .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:3000;padding:40px;justify-content:center;align-items:center;overflow:auto}
   .overlay-content{background:var(--card);color:var(--ink);border-radius:14px;max-width:1000px;width:95%;max-height:90%;margin:0 auto;padding:20px;position:relative;overflow:auto;white-space:pre-wrap}
@@ -98,7 +108,8 @@
   #pdfOverlayFrame{width:100%;height:80vh;border:none;border-radius:10px;background:#fff}
   .pdf-actions{display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px}
   .tiny-btn{padding:6px 8px;font-size:12px;border-radius:8px}
-  @media (max-width: 1100px){
+
+  @media (max-width:1100px){
     .flex-container{flex-direction:column;align-items:stretch}
     .calculator{width:100%}
     .sidebar{min-width:unset}
@@ -108,22 +119,36 @@
 </head>
 <body>
 <button id="themeToggle" aria-label="Toggle dark mode">🌙</button>
+
 <div class="flex-container">
 
   <!-- Calculator -->
   <div class="calculator">
-    <h2>HSD Offer Calculator</h2>
+    <!-- TOP LOGO + TITLE -->
+    <div class="calc-header">
+      <img
+        class="calc-logo"
+        src="./hsd-logo.png"
+        alt="House Sales Direct"
+        onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,<?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?><svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;160&quot; height=&quot;40&quot; viewBox=&quot;0 0 160 40&quot;><rect width=&quot;160&quot; height=&quot;40&quot; rx=&quot;8&quot; fill=&quot;%231a73e8&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; dominant-baseline=&quot;middle&quot; text-anchor=&quot;middle&quot; fill=&quot;white&quot; font-family=&quot;Poppins,Arial&quot; font-size=&quot;18&quot;>HSD</text></svg>';"
+      />
+      <h1 class="calc-title">HSD Offer Calculator</h1>
+    </div>
 
     <!-- Email/Password Auth -->
     <div id="authBox" class="stack" style="margin:12px 0">
-      <input type="email" id="authEmail" placeholder="Email">
-      <input type="password" id="authPassword" placeholder="Password">
+      <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
+      <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
       <div class="button-group">
         <button id="signupBtn" class="ghost" type="button">Create account</button>
         <button id="signinBtn" type="button">Sign in</button>
         <button id="logoutBtn" type="button" class="ghost">Sign out</button>
       </div>
       <small id="whoami" style="opacity:.8">Not signed in</small>
+      <details style="margin-top:6px">
+        <summary>Auth debug</summary>
+        <pre id="authDebug" style="white-space:pre-wrap;font-size:12px;opacity:.8"></pre>
+      </details>
     </div>
 
     <label for="customerName">Customer Name</label>
@@ -185,11 +210,7 @@
   <!-- Sidebar -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <div class="sidebar-brand">
-        <!-- Put your logo at /hsd-logo.png or update src below -->
-        <img src="/hsd-logo.png" alt="House Sales Direct" class="sidebar-logo" />
-        <h2>Templates & Saved Data</h2>
-      </div>
+      <h2>Templates & Saved Data</h2>
       <button id="exportBtn" class="export-btn" title="Export Backup">💾</button>
     </div>
 
@@ -377,13 +398,19 @@
 <script>
   const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
 
   const Backend = {
-    async user() {
-      const { data: { user } } = await supabase.auth.getUser();
-      return user;
-    },
+    async session(){ const { data } = await supabase.auth.getSession(); return data.session; },
+    async user(){ const { data:{ user } } = await supabase.auth.getUser(); return user; },
+
     async signUp(email, password) {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
@@ -398,6 +425,8 @@
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
+
+    // Cloud storage for calculations
     async saveCalculation(row) {
       const user = await this.user();
       if (!user) throw new Error('Not signed in');
@@ -425,48 +454,66 @@
 
   // Sign in/out UI
   const whoami = document.getElementById('whoami');
+  const authDebug = document.getElementById('authDebug');
   const email = document.getElementById('authEmail');
   const password = document.getElementById('authPassword');
 
+  function showToast(msg){
+    const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+    document.body.appendChild(t); setTimeout(()=>{t.remove();}, 2200);
+  }
+
+  async function refreshAuthUI() {
+    const user = await Backend.user();
+    const session = await Backend.session();
+    whoami.textContent = user ? `Signed in as ${user.email}` : 'Not signed in';
+    if (authDebug) {
+      authDebug.textContent = JSON.stringify({ user, hasSession: !!session, expires_at: session?.expires_at }, null, 2);
+    }
+  }
+
   document.getElementById('signupBtn').onclick = async () => {
     if (!email.value || !password.value) return alert('Enter email & password');
-    if (password.value.length < 6) return alert('Password must be at least 6 characters');
     try {
-      await Backend.signUp(email.value.trim(), password.value);
-      alert('Account created. If email confirmation is required, check your inbox.');
+      const data = await Backend.signUp(email.value, password.value);
+      showToast('Account created.');
+      if (data?.user?.identities?.length === 0) {
+        // existing user case
+        showToast('User already exists. Try signing in.');
+      }
     } catch (e) {
       alert(e.message || 'Sign-up failed');
-      console.error(e);
     }
   };
 
   document.getElementById('signinBtn').onclick = async () => {
     if (!email.value || !password.value) return alert('Enter email & password');
     try {
-      await Backend.signIn(email.value.trim(), password.value);
-      location.reload(); // ensures UI + data refresh
+      await Backend.signIn(email.value, password.value);
+      showToast('Signed in');
     } catch (e) {
-      alert(e.message || 'Sign-in failed');
-      console.error(e);
+      // Give clearer guidance on common issues
+      const msg = String(e?.message || '').toLowerCase();
+      if (msg.includes('email not confirmed')) {
+        alert('Your email is not confirmed. Confirm it in Supabase or disable confirmation in Auth settings.');
+      } else {
+        alert(e.message || 'Sign-in failed');
+      }
     }
   };
 
   document.getElementById('logoutBtn').onclick = async () => {
     try { await Backend.signOut(); location.reload(); }
-    catch (e) { alert(e?.message || 'Sign-out failed'); console.error(e); }
+    catch (e) { alert(e?.message || 'Sign-out failed'); }
   };
 
-  async function refreshWho() {
-    const u = await Backend.user();
-    whoami.textContent = u ? `Signed in as ${u.email}` : 'Not signed in';
-  }
-
   supabase.auth.onAuthStateChange(async () => {
-    await refreshWho();
+    await refreshAuthUI();
     if (window.migrateLocalCalcsToCloudIfNeeded) await window.migrateLocalCalcsToCloudIfNeeded();
     if (window.syncCalcsFromCloud) await window.syncCalcsFromCloud();
   });
-  refreshWho();
+
+  refreshAuthUI();
 </script>
 
 <!-- Main App Script -->
@@ -475,10 +522,7 @@
   // ----- Utilities -----
   const $ = sel => document.querySelector(sel);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
-  const Storage = {
-    get: (key) => JSON.parse(localStorage.getItem(key) || '[]'),
-    set: (key, val) => localStorage.setItem(key, JSON.stringify(val)),
-  };
+  const Storage = { get: (k) => JSON.parse(localStorage.getItem(k) || '[]'), set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
   function showToast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>{t.remove();}, 2200); }
   function debounce(fn, delay){ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a), delay);} }
   function roundToNearestThousand(n){ return Math.round(n/1000)*1000; }
@@ -542,8 +586,16 @@
   };
 
   // Money formatting for inputs
-  function formatMoneyInput(el){ if(!el) return; el.addEventListener('input', function(){ let val = this.value.replace(/,/g,''); if(val && !isNaN(val)){ this.value = parseInt(val,10).toLocaleString(); } else if(val === '') this.value = ''; }); }
-  [ priceInput,'val_marketValue','val_spreadOffer','val_redemption','val_requiredReneg','c1_listPrice','c1_soldPrice','c2_listPrice','c2_soldPrice','c3_listPrice','c3_soldPrice' ].forEach(id=> formatMoneyInput(typeof id==='string' ? document.getElementById(id) : id));
+  function formatMoneyInput(el){
+    if(!el) return;
+    el.addEventListener('input', function(){
+      let val = this.value.replace(/,/g,'');
+      if(val && !isNaN(val)){ this.value = parseInt(val,10).toLocaleString(); }
+      else if(val === '') this.value = '';
+    });
+  }
+  [ priceInput,'val_marketValue','val_spreadOffer','val_redemption','val_requiredReneg','c1_listPrice','c1_soldPrice','c2_listPrice','c2_soldPrice','c3_listPrice','c3_soldPrice' ]
+    .forEach(id=> formatMoneyInput(typeof id==='string' ? document.getElementById(id) : id));
 
   // Renovations flow
   function populateRenovations(){
@@ -591,7 +643,6 @@
     if(isNaN(listedPrice)){ resultDiv.textContent = 'Enter a valid listed price.'; return; }
     const days = parseInt(daysSelect.value,10);
     const spread = getSpread(listedPrice);
-
     let baseBottom, baseTop;
     if(days === 180){ baseTop = listedPrice * 0.95; baseBottom = baseTop - spread; }
     else if(days === 90){ baseBottom = listedPrice * 0.90; baseTop = baseBottom + spread; }
@@ -619,7 +670,7 @@
     const adjClass = adjBottom >= bottomOffer ? 'adjusted-green' : 'adjusted-red';
     resultDiv.innerHTML = `
       <div class="original-offer">Original Offer: £${bottomOffer.toLocaleString()} - £${topOffer.toLocaleString()}</div>
-      ${ totalRenovation>0 ? `<div>Renovation Costs: £${totalRenovation.toLocaleString()}</div>` : ''}
+      ${ totalRenovation>0 ? `<div>Renovation Costs: £${totalRenovation.toLocaleString()}</div>` : '' }
       <div class="adjusted-offer ${adjClass}">Adjusted Offer: £${adjBottom.toLocaleString()} - £${adjTop.toLocaleString()}</div>
     `;
   }
@@ -630,8 +681,8 @@
     if(!confirm('Clear current inputs?')) return;
     customerInput.value=''; priceInput.value=''; daysSelect.value='7';
     propertyTypeSelect.value=''; propertyTypeGroup.style.display='none';
-    renovationOptionsDiv.style.display='none'; resultDiv.textContent='';
-    renovationOptionsDiv.innerHTML=''; currentOffers=null;
+    renovationOptionsDiv.style.display='none'; renovationOptionsDiv.innerHTML='';
+    resultDiv.textContent=''; currentOffers=null;
   });
 
   // ----- Saved Calculations (CLOUD + local fallback) -----
@@ -640,13 +691,12 @@
     savedCalcList.innerHTML = '';
     savedCalculations.forEach((entry, index)=>{
       if((entry.name||'').toLowerCase().includes(searchTerm)){
-        const ts = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
         const div = document.createElement('div'); div.className='saved-entry';
         div.innerHTML = `
-          <div style="background:var(--chip);padding:6px;border-radius:8px;margin-bottom:4px;"><strong>${entry.name}</strong> | ${entry.propertyType || (entry.includeRenov ? '—' : '—')}</div>
+          <div style="background:var(--chip);padding:6px;border-radius:8px;margin-bottom:4px;"><strong>${entry.name}</strong> | ${entry.propertyType || '—'}</div>
           <div style="background:#d0e5ff;padding:6px;border-radius:8px;">Original: £${entry.originalOffer.bottom.toLocaleString()} - £${entry.originalOffer.top.toLocaleString()}</div>
           <div style="background:${entry.adjustedOffer.bottom >= entry.originalOffer.bottom ? 'var(--good)' : 'var(--bad)'};padding:6px;border-radius:8px;margin-top:4px">Adjusted: £${entry.adjustedOffer.bottom.toLocaleString()} - £${entry.adjustedOffer.top.toLocaleString()}</div>
-          <small style="opacity:.8">Saved: ${ts}</small>
+          <small style="opacity:.8">Saved: ${new Date(entry.timestamp).toLocaleString()}</small>
           <button class="del-btn" title="Delete">Del</button>
         `;
         div.querySelector('.del-btn').addEventListener('click', async (ev)=>{
@@ -685,7 +735,6 @@
     if(!customerInput.value.trim()){ return showToast('Enter customer name first'); }
     if(!currentOffers){ return showToast('Calculate offer first'); }
     const includeRenov = document.querySelector('input[name="includeRenov"]:checked')?.value === 'yes';
-
     const entry = {
       name: customerInput.value.trim(),
       listedPrice: priceInput.value,
@@ -697,7 +746,6 @@
       adjustedOffer: { bottom: currentOffers.adjBottom, top: currentOffers.adjTop },
       timestamp: new Date().toISOString()
     };
-
     const user = await Backend.user();
     if (user){
       try { await Backend.saveCalculation(entry); showToast('Saved to cloud'); await syncCalcsFromCloud(); }
@@ -853,8 +901,7 @@
   comps.forEach(d=>{ d.addEventListener('toggle', ()=>{ if(d.open){ comps.forEach(other=>{ if(other!==d) other.removeAttribute('open'); }); } }); });
 
   // ======= SCRIPTS - PDF STORAGE (IndexedDB) =======
-  const DB_NAME = 'hsd_pdf_db';
-  const DB_STORE = 'pdfs';
+  const DB_NAME = 'hsd_pdf_db'; const DB_STORE = 'pdfs';
   let db;
   function openDB(){ return new Promise((resolve, reject)=>{ const req = indexedDB.open(DB_NAME, 1); req.onupgradeneeded = (e)=>{ db = e.target.result; if(!db.objectStoreNames.contains(DB_STORE)){ db.createObjectStore(DB_STORE, { keyPath:'id', autoIncrement:true }); } }; req.onsuccess = (e)=>{ db = e.target.result; resolve(db); }; req.onerror = (e)=> reject(e); }); }
   async function dbAddPDF(name, blob){ await openDB(); return new Promise((resolve, reject)=>{ const tx = db.transaction(DB_STORE, 'readwrite'); const store = tx.objectStore(DB_STORE); const now = new Date().toISOString(); const req = store.add({ name, blob, createdAt: now }); req.onsuccess = ()=> resolve(req.result); req.onerror = (e)=> reject(e); }); }
@@ -882,6 +929,7 @@
       }
     } catch (e) { console.error(e); }
   };
+
 })();
 </script>
 </body>
