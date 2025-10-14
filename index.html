@@ -32,12 +32,10 @@
   }
   .calculator{width:640px;position:relative}
 
-  /* Calculator header with logo next to title */
-  .calc-header{
-    display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:16px;
-  }
-  .calc-logo{height:32px;width:auto;display:block}
-  .calc-title{margin:0;font-size:28px;color:var(--brand)}
+  /* Header: logo next to title */
+  .calc-header{ display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:16px; }
+  .calc-logo{ height:32px; width:auto; display:block }
+  .calc-title{ margin:0; font-size:28px; color:var(--brand) }
 
   label{display:block;margin-bottom:6px;font-weight:600;color:var(--muted)}
   input,select,textarea,button{font-family:'Poppins',sans-serif;font-size:16px}
@@ -71,9 +69,7 @@
   .sidebar-brand{display:flex;align-items:center;gap:10px}
   .sidebar-logo{height:28px;width:auto;display:block}
   .sidebar-header h2{font-size:22px;color:var(--brand);margin:0}
-  .sidebar-header::after{
-    content:"";display:block;position:absolute;left:0;right:0;height:1px;background:var(--border);bottom:-8px;opacity:.6;
-  }
+  .sidebar-header::after{content:"";display:block;position:absolute;left:0;right:0;height:1px;background:var(--border);bottom:-8px;opacity:.6}
   .export-btn{background:transparent;border:none;cursor:pointer;font-size:16px;color:var(--brand);opacity:0.8;transition:.2s;padding:6px;border-radius:8px}
   .export-btn:hover{opacity:1;transform:scale(1.06);background:var(--soft)}
 
@@ -118,7 +114,6 @@
     .sidebar.wide{min-width:unset;max-width:unset;width:100%}
     .calc-header{justify-content:flex-start}
   }
-  [data-theme="dark"] .sidebar-logo, [data-theme="dark"] .calc-logo { /* adjust if needed */ }
 </style>
 </head>
 <body>
@@ -133,7 +128,7 @@
       <h2 class="calc-title">HSD Offer Calculator</h2>
     </div>
 
-    <!-- Email/Password Auth (simple) -->
+    <!-- Email/Password Auth -->
     <div id="authBox" class="stack" style="margin:12px 0">
       <input type="email" id="authEmail" placeholder="Email">
       <input type="password" id="authPassword" placeholder="Password">
@@ -164,7 +159,7 @@
     </div>
 
     <!-- Renovations FIRST -->
-    <div class="renovation-section" id="renovationSection" aria-hidden="false">
+    <div class="renovation-section" id="renovationSection">
       <label>Include Renovation Costs?</label>
       <div class="stack" role="radiogroup" aria-label="Include renovations">
         <label><input type="radio" name="includeRenov" value="yes"> Yes</label>
@@ -221,7 +216,6 @@
     </div>
 
     <div class="tab-content">
-
       <div id="calculations" class="tab-section" style="display:block;">
         <div class="stack">
           <input type="text" id="searchCalc" placeholder="Search by customer name">
@@ -301,6 +295,7 @@
           <details class="collapsible" id="comp1" open>
             <summary>Comparable 1 <span class="caret">▾</span></summary>
             <div class="content">
+              <!-- fields omitted for brevity; keep as in your last draft -->
               <div class="v-field"><label>URL</label><input id="c1_url" type="text" placeholder="https://..."></div>
               <div class="v-field"><label>Property Address</label><input id="c1_address" type="text"></div>
               <div class="v-field"><label>Estate Agent</label><input id="c1_agent" type="text"></div>
@@ -320,6 +315,7 @@
           <details class="collapsible" id="comp2">
             <summary>Comparable 2 <span class="caret">▾</span></summary>
             <div class="content">
+              <!-- same structure as comp1 -->
               <div class="v-field"><label>URL</label><input id="c2_url" type="text" placeholder="https://..."></div>
               <div class="v-field"><label>Property Address</label><input id="c2_address" type="text"></div>
               <div class="v-field"><label>Estate Agent</label><input id="c2_agent" type="text"></div>
@@ -339,6 +335,7 @@
           <details class="collapsible" id="comp3">
             <summary>Comparable 3 <span class="caret">▾</span></summary>
             <div class="content">
+              <!-- same structure as comp1 -->
               <div class="v-field"><label>URL</label><input id="c3_url" type="text" placeholder="https://..."></div>
               <div class="v-field"><label>Property Address</label><input id="c3_address" type="text"></div>
               <div class="v-field"><label>Estate Agent</label><input id="c3_agent" type="text"></div>
@@ -364,7 +361,6 @@
 
         <div id="valuationList" class="stack"></div>
       </div>
-
     </div>
   </div>
 </div>
@@ -419,7 +415,7 @@
       if (error) throw error; return data;
     },
     async listCalculations(){
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from('calculations')
         .select('id, data, created_at')
         .order('created_at', { ascending:false });
@@ -448,12 +444,8 @@
   document.getElementById('signinBtn').onclick = async () => {
     if (!emailEl.value || !passEl.value) return alert('Enter email & password');
     try {
-      await Backend.signIn(emailEl.value, passEl.value);
-      // onAuthStateChange will refresh UI & sync
-    } catch(e){
-      // Common: "Email not confirmed"
-      alert(e?.message || 'Sign-in failed');
-    }
+      await Backend.signIn(emailEl.value, passEl.value); // onAuthStateChange will update UI
+    } catch(e){ alert(e?.message || 'Sign-in failed'); }
   };
 
   document.getElementById('logoutBtn').onclick = async () => {
@@ -466,7 +458,7 @@
     authStatus.textContent = u ? `Signed in as ${u.email}` : 'Not signed in';
   }
 
-  supabase.auth.onAuthStateChange(async (_event, _session) => {
+  supabase.auth.onAuthStateChange(async () => {
     await refreshAuthStatus();
     if (window.migrateLocalCalcsToCloudIfNeeded) await window.migrateLocalCalcsToCloudIfNeeded();
     if (window.syncCalcsFromCloud) await window.syncCalcsFromCloud();
@@ -551,9 +543,8 @@
     if(!el) return;
     el.addEventListener('input', function(){
       let val = this.value.replace(/,/g,'');
-      if(val && !isNaN(val)){
-        this.value = parseInt(val,10).toLocaleString();
-      } else if(val === '') this.value = '';
+      if(val && !isNaN(val)){ this.value = parseInt(val,10).toLocaleString(); }
+      else if(val === '') this.value = '';
     });
   }
   [ priceInput,'val_marketValue','val_spreadOffer','val_redemption','val_requiredReneg','c1_listPrice','c1_soldPrice','c2_listPrice','c2_soldPrice','c3_listPrice','c3_soldPrice' ]
@@ -664,7 +655,7 @@
         `;
         div.addEventListener('click', (ev)=>{
           if(ev.target.closest('button')) return;
-          // Show a quick overlay preview of the calculation
+          // quick preview
           overlayTitle.innerText = `${entry.name} — Saved Calculation`;
           overlayText.innerText =
             `Listed Price: £${entry.listedPrice}\nTimeframe: ${entry.timeframe} days\nInclude Renovations: ${entry.includeRenov ? 'Yes' : 'No'}${entry.propertyType ? `\nProperty Type: ${entry.propertyType}`:''}\n\nOriginal: £${entry.originalOffer.bottom.toLocaleString()} - £${entry.originalOffer.top.toLocaleString()}\nAdjusted: £${entry.adjustedOffer.bottom.toLocaleString()} - £${entry.adjustedOffer.top.toLocaleString()}\nRenovations: ${(entry.renovations||[]).join(', ') || '—'}\nSaved: ${new Date(entry.timestamp).toLocaleString()}`;
@@ -691,7 +682,7 @@
     });
   }
 
-  // Merge cloud + local so nothing “disappears”
+  // Merge cloud + local
   async function syncCalcsFromCloud(){
     try{
       const user = await Backend.user();
@@ -928,11 +919,6 @@
       }
     });
   }
-  const saveValuationBtn = $('#saveValuation');
-  const valSearch = $('#valSearch');
-  const clearAllValuationsBtn = $('#clearAllValuations');
-  const clearValuationFormBtn = $('#clearValuationForm');
-
   saveValuationBtn.addEventListener('click', ()=>{
     const v = getValuationFromForm();
     if(!v.val_customerName){ return showToast('Add a Customer Name before saving'); }
@@ -980,11 +966,54 @@
   async function dbAddPDF(name, blob){ await openDB(); return new Promise((resolve, reject)=>{ const tx = db.transaction(DB_STORE, 'readwrite'); const store = tx.objectStore(DB_STORE); const now = new Date().toISOString(); const req = store.add({ name, blob, createdAt: now }); req.onsuccess = ()=> resolve(req.result); req.onerror = (e)=> reject(e); }); }
   async function dbGetAllPDFs(){ await openDB(); return new Promise((resolve, reject)=>{ const tx = db.transaction(DB_STORE, 'readonly'); const store = tx.objectStore(DB_STORE); const req = store.getAll(); req.onsuccess = ()=> resolve(req.result || []); req.onerror = (e)=> reject(e); }); }
   async function dbDeletePDF(id){ await openDB(); return new Promise((resolve, reject)=>{ const tx = db.transaction(DB_STORE, 'readwrite'); const store = tx.objectStore(DB_STORE); const req = store.delete(id); req.onsuccess = ()=> resolve(); req.onerror = (e)=> reject(e); }); }
-  async function renderPDFs(){ const search = (searchPdfs.value || '').toLowerCase(); const items = await dbGetAllPDFs(); pdfList.innerHTML = ''; items.filter(item => !search || item.name.toLowerCase().includes(search)).forEach(item => { const div = document.createElement('div'); div.className = 'saved-entry'; div.innerHTML = ` <div style="font-weight:600">${item.name}</div> <small style="opacity:.8">${new Date(item.createdAt).toLocaleString()}</small> <button class="del-btn">Del</button> `; div.addEventListener('click', async (ev)=>{ if(ev.target.closest('button')) return; const url = URL.createObjectURL(item.blob); pdfOverlayTitle.textContent = item.name; pdfOverlayFrame.src = url + '#view=FitH'; downloadPdfBtn.onclick = ()=>{ const a = document.createElement('a'); a.href = url; a.download = item.name || 'script.pdf'; a.click(); }; openPdfNewTabBtn.onclick = ()=> window.open(url, '_blank'); pdfOverlay.style.display = 'flex'; }); div.querySelector('.del-btn').addEventListener('click', async (ev)=>{ ev.stopPropagation(); if(!confirm('Delete this PDF?')) return; await dbDeletePDF(item.id); renderPDFs(); showToast('PDF deleted'); }); pdfList.appendChild(div); }); }
-  const uploadPdfBtn = $('#uploadPdfBtn'); const pdfInput = $('#pdfInput'); const clearAllPdfsBtn = $('#clearAllPdfs'); const searchPdfs = $('#searchPdfs'); const pdfList = $('#pdfList');
+
+  async function renderPDFs(){
+    const search = (searchPdfs.value || '').toLowerCase();
+    const items = await dbGetAllPDFs();
+    pdfList.innerHTML = '';
+    items.filter(item => !search || item.name.toLowerCase().includes(search)).forEach(item => {
+      const div = document.createElement('div'); div.className = 'saved-entry';
+      div.innerHTML = `
+        <div style="font-weight:600">${item.name}</div>
+        <small style="opacity:.8">${new Date(item.createdAt).toLocaleString()}</small>
+        <button class="del-btn">Del</button>
+      `;
+      div.addEventListener('click', async (ev)=>{
+        if(ev.target.closest('button')) return;
+        const url = URL.createObjectURL(item.blob);
+        pdfOverlayTitle.textContent = item.name;
+        pdfOverlayFrame.src = url + '#view=FitH';
+        downloadPdfBtn.onclick = ()=>{ const a = document.createElement('a'); a.href = url; a.download = item.name || 'script.pdf'; a.click(); };
+        openPdfNewTabBtn.onclick = ()=> window.open(url, '_blank');
+        pdfOverlay.style.display = 'flex';
+      });
+      div.querySelector('.del-btn').addEventListener('click', async (ev)=>{
+        ev.stopPropagation();
+        if(!confirm('Delete this PDF?')) return;
+        await dbDeletePDF(item.id);
+        renderPDFs(); showToast('PDF deleted');
+      });
+      pdfList.appendChild(div);
+    });
+  }
   uploadPdfBtn.addEventListener('click', ()=> pdfInput.click());
-  pdfInput.addEventListener('change', async ()=>{ const files = Array.from(pdfInput.files || []); if(!files.length) return; for(const f of files){ if(f.type !== 'application/pdf'){ showToast('Only PDF files allowed'); continue; } if(f.size > 100 * 1024 * 1024){ showToast('PDF too large (>100MB)'); continue; } await dbAddPDF(f.name, f); } pdfInput.value = ''; await renderPDFs(); showToast('PDF(s) uploaded'); });
-  clearAllPdfsBtn.addEventListener('click', async ()=>{ if(!confirm('Clear ALL uploaded PDFs?')) return; await openDB(); const tx = db.transaction(DB_STORE, 'readwrite'); tx.objectStore(DB_STORE).clear(); tx.oncomplete = ()=>{ renderPDFs(); showToast('All PDFs cleared'); }; });
+  pdfInput.addEventListener('change', async ()=>{
+    const files = Array.from(pdfInput.files || []);
+    if(!files.length) return;
+    for(const f of files){
+      if(f.type !== 'application/pdf'){ showToast('Only PDF files allowed'); continue; }
+      if(f.size > 100 * 1024 * 1024){ showToast('PDF too large (>100MB)'); continue; }
+      await dbAddPDF(f.name, f);
+    }
+    pdfInput.value = '';
+    await renderPDFs(); showToast('PDF(s) uploaded');
+  });
+  clearAllPdfsBtn.addEventListener('click', async ()=>{
+    if(!confirm('Clear ALL uploaded PDFs?')) return;
+    await openDB(); const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).clear();
+    tx.oncomplete = ()=>{ renderPDFs(); showToast('All PDFs cleared'); };
+  });
   closePdfOverlay.addEventListener('click', ()=>{ pdfOverlayFrame.src = 'about:blank'; pdfOverlay.style.display = 'none'; });
   searchPdfs.addEventListener('input', debounce(renderPDFs, 150));
   renderPDFs();
@@ -1003,9 +1032,7 @@
       }
     } catch(e){ console.error(e); }
   };
-
 })();
 </script>
 </body>
 </html>
-
