@@ -33,11 +33,9 @@
   .calculator{width:640px;position:relative}
 
   /* Header with logo next to title */
-  .calc-header{
-    display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:16px;
-  }
-  .calc-logo{height:36px; width:auto; display:block}
-  .calc-title{margin:0; font-size:28px; color:var(--brand);}
+  .calc-header{ display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:16px; }
+  .calc-logo{ height:36px; width:auto; display:block }
+  .calc-title{ margin:0; font-size:28px; color:var(--brand); }
 
   label{display:block;margin-bottom:6px;font-weight:600;color:var(--muted)}
   input,select,textarea,button{font-family:'Poppins',sans-serif;font-size:16px}
@@ -127,14 +125,15 @@
   <!-- Calculator -->
   <div class="calculator">
     <div class="calc-header">
-      <img src="/assets/hsd-logo.png" class="calc-logo" alt="House Sales Direct">
+      <img src="/assets/hsd-logo.png" class="calc-logo" alt="House Sales Direct"
+           onerror="this.onerror=null;this.src='HSD LOGO.png'">
       <h2 class="calc-title">HSD Offer Calculator</h2>
     </div>
 
     <!-- Email/Password Auth -->
     <div id="authBox" class="stack" style="margin:12px 0">
-      <input type="email" id="authEmail" placeholder="Email">
-      <input type="password" id="authPassword" placeholder="Password">
+      <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
+      <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
       <div class="button-group">
         <button id="signupBtn" class="ghost" type="button">Create account</button>
         <button id="signinBtn" type="button">Sign in</button>
@@ -203,7 +202,8 @@
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-brand">
-        <img src="/assets/hsd-logo.png" alt="House Sales Direct" class="sidebar-logo" />
+        <img src="/assets/hsd-logo.png" alt="House Sales Direct" class="sidebar-logo"
+             onerror="this.onerror=null;this.src='HSD LOGO.png'"/>
         <h2>Templates & Saved Data</h2>
       </div>
       <button id="exportBtn" class="export-btn" title="Export Backup">💾</button>
@@ -391,9 +391,17 @@
 <!-- Supabase client + Backend -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+  // ⚠️ If you open this file as file:// many browsers block some features. We'll warn you:
+  (function(){ if (location.protocol === 'file:') { setTimeout(()=>alert('You opened this file via file:// which can break auth. Please use a local server (e.g. VSCode Live Server) so the origin is http://localhost.'), 100); } })();
+
   const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const supabase = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+    { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }
+  );
 
   const Backend = {
     async user() {
@@ -444,20 +452,39 @@
   const email = document.getElementById('authEmail');
   const password = document.getElementById('authPassword');
 
+  function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
+
   document.getElementById('signupBtn').onclick = async () => {
     if (!email.value || !password.value) return alert('Enter email & password');
-    try { await Backend.signUp(email.value, password.value); alert('Account created. Check email if confirmation required.'); }
-    catch (e) { alert(e.message || 'Sign-up failed'); }
+    try {
+      const out = await Backend.signUp(email.value, password.value);
+      alert('Account created. If email confirmation is enabled, confirm your email then sign in.');
+      // optional: sign in automatically if session returned
+      const session = (await supabase.auth.getSession()).data.session;
+      if (session) { await refreshWho(); toast('Signed in'); if (window.syncCalcsFromCloud) window.syncCalcsFromCloud(); }
+    } catch (e) {
+      alert(e.message || 'Sign-up failed');
+    }
   };
 
   document.getElementById('signinBtn').onclick = async () => {
     if (!email.value || !password.value) return alert('Enter email & password');
-    try { await Backend.signIn(email.value, password.value); }
-    catch (e) { alert(e.message || 'Sign-in failed'); }
+    try {
+      await Backend.signIn(email.value, password.value);
+      await refreshWho();
+      toast('Signed in');
+      if (window.syncCalcsFromCloud) window.syncCalcsFromCloud();
+    } catch (e) {
+      // Show common helpful message
+      const msg = (e && e.message || '').toLowerCase().includes('email not confirmed')
+        ? 'Email not confirmed. Please verify your email, then sign in.'
+        : (e.message || 'Sign-in failed');
+      alert(msg);
+    }
   };
 
   document.getElementById('logoutBtn').onclick = async () => {
-    try { await Backend.signOut(); window.location.reload(); }
+    try { await Backend.signOut(); toast('Signed out'); setTimeout(()=>window.location.reload(), 350); }
     catch (e) { alert(e?.message || 'Sign-out failed'); console.error(e); }
   };
 
@@ -481,20 +508,11 @@
   // ----- Utilities -----
   const $ = sel => document.querySelector(sel);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
-  const Storage = {
-    get: (key) => JSON.parse(localStorage.getItem(key) || '[]'),
-    set: (key, val) => localStorage.setItem(key, JSON.stringify(val)),
-  };
+  const Storage = { get: (k) => JSON.parse(localStorage.getItem(k) || '[]'), set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
   function showToast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>{t.remove();}, 2200); }
-  function debounce(fn, delay){ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a), delay);} }
-  function roundToNearestThousand(n){ return Math.round(n/1000)*1000; }
-  function getSpread(listedPrice){
-    if(listedPrice <= 149999) return 5000;
-    if(listedPrice <= 249999) return 10000;
-    if(listedPrice <= 349999) return 15000;
-    if(listedPrice <= 449999) return 20000;
-    return 25000;
-  }
+  const debounce = (fn,d)=>{ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a),d);} };
+  const roundToNearestThousand = n => Math.round(n/1000)*1000;
+  function getSpread(listedPrice){ if(listedPrice<=149999)return 5000; if(listedPrice<=249999)return 10000; if(listedPrice<=349999)return 15000; if(listedPrice<=449999)return 20000; return 25000; }
 
   // ----- Elements -----
   const priceInput = $('#listedPrice');
@@ -553,14 +571,13 @@
     "3 bed bungalow":  { Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 }
   };
 
-  // Money formatting for inputs
+  // Money formatting
   function formatMoneyInput(el){
     if(!el) return;
     el.addEventListener('input', function(){
       let val = this.value.replace(/,/g,'');
-      if(val && !isNaN(val)){
-        this.value = parseInt(val,10).toLocaleString();
-      } else if(val === '') this.value = '';
+      if(val && !isNaN(val)) this.value = parseInt(val,10).toLocaleString();
+      else if(val === '') this.value = '';
     });
   }
   [ priceInput,'val_marketValue','val_spreadOffer','val_redemption','val_requiredReneg','c1_listPrice','c1_soldPrice','c2_listPrice','c2_soldPrice','c3_listPrice','c3_soldPrice' ]
@@ -596,20 +613,19 @@
   });
 
   propertyTypeSelect.addEventListener('change', () => {
-    if (propertyTypeSelect.value) {
-      populateRenovations();
-      renovationOptionsDiv.style.display = 'grid';
-    } else {
-      renovationOptionsDiv.style.display = 'none';
-      renovationOptionsDiv.innerHTML = '';
-    }
+    if (propertyTypeSelect.value) { populateRenovations(); renovationOptionsDiv.style.display = 'grid'; }
+    else { renovationOptionsDiv.style.display = 'none'; renovationOptionsDiv.innerHTML = ''; }
     calculateOffer();
   });
 
+  // 👉 recompute automatically as user types/changes timeframe
+  priceInput.addEventListener('input', () => calculateOffer());
+  daysSelect.addEventListener('change', () => calculateOffer());
+
   function calculateOffer(){
-    const rawPrice = priceInput.value.replace(/,/g,'');
+    const rawPrice = (priceInput.value || '').replace(/,/g,'');
     const listedPrice = parseFloat(rawPrice);
-    if(isNaN(listedPrice)){ resultDiv.textContent = 'Enter a valid listed price.'; return; }
+    if(isNaN(listedPrice)){ resultDiv.textContent = 'Enter a valid listed price.'; currentOffers=null; return; }
 
     const days = parseInt(daysSelect.value,10);
     const spread = getSpread(listedPrice);
@@ -654,18 +670,12 @@
   }
 
   calculateBtn.addEventListener('click', calculateOffer);
-  priceInput.addEventListener('keypress', e=>{ if(e.key==='Enter') calculateOffer(); });
   clearBtn.addEventListener('click', ()=>{
     if(!confirm('Clear current inputs?')) return;
-    $('#customerName').value='';
-    $('#listedPrice').value='';
-    daysSelect.value='7';
-    propertyTypeSelect.value='';
-    propertyTypeGroup.style.display='none';
-    renovationOptionsDiv.style.display='none';
-    renovationOptionsDiv.innerHTML='';
-    resultDiv.textContent='';
-    currentOffers=null;
+    customerInput.value=''; priceInput.value=''; daysSelect.value='7';
+    propertyTypeSelect.value=''; propertyTypeGroup.style.display='none';
+    renovationOptionsDiv.style.display='none'; renovationOptionsDiv.innerHTML='';
+    resultDiv.textContent=''; currentOffers=null;
   });
 
   // ----- Saved Calculations (CLOUD + local fallback) -----
@@ -676,9 +686,15 @@
       if((entry.name||'').toLowerCase().includes(searchTerm)){
         const div = document.createElement('div'); div.className='saved-entry';
         div.innerHTML = `
-          <div style="background:var(--chip);padding:6px;border-radius:8px;margin-bottom:4px;"><strong>${entry.name}</strong> | ${entry.propertyType || (entry.includeRenov ? '—' : 'No renovations')}</div>
-          <div style="background:#d0e5ff;padding:6px;border-radius:8px;">Original: £${entry.originalOffer.bottom.toLocaleString()} - £${entry.originalOffer.top.toLocaleString()}</div>
-          <div style="background:${entry.adjustedOffer.bottom >= entry.originalOffer.bottom ? 'var(--good)' : 'var(--bad)'};padding:6px;border-radius:8px;margin-top:4px">Adjusted: £${entry.adjustedOffer.bottom.toLocaleString()} - £${entry.adjustedOffer.top.toLocaleString()}</div>
+          <div style="background:var(--chip);padding:6px;border-radius:8px;margin-bottom:4px;">
+            <strong>${entry.name}</strong> | ${(entry.includeRenov ? (entry.propertyType || '—') : 'No renovations')}
+          </div>
+          <div style="background:#d0e5ff;padding:6px;border-radius:8px;">
+            Original: £${entry.originalOffer.bottom.toLocaleString()} - £${entry.originalOffer.top.toLocaleString()}
+          </div>
+          <div style="background:${entry.adjustedOffer.bottom >= entry.originalOffer.bottom ? 'var(--good)' : 'var(--bad)'};padding:6px;border-radius:8px;margin-top:4px">
+            Adjusted: £${entry.adjustedOffer.bottom.toLocaleString()} - £${entry.adjustedOffer.top.toLocaleString()}
+          </div>
           <small style="opacity:.8">Saved: ${new Date(entry.timestamp).toLocaleString?.() || entry.timestamp}</small>
           <button class="del-btn" title="Delete">Del</button>
         `;
@@ -713,18 +729,17 @@
   }
   window.syncCalcsFromCloud = syncCalcsFromCloud;
 
-  // SAVE: cloud when signed in; otherwise local
   saveBtn.addEventListener('click', async ()=>{
-    if(!$('#customerName').value.trim()){ return showToast('Enter customer name first'); }
+    if(!customerInput.value.trim()){ return showToast('Enter customer name first'); }
     if(!currentOffers){ return showToast('Calculate offer first'); }
 
     const includeRenov = document.querySelector('input[name="includeRenov"]:checked')?.value === 'yes';
     const entry = {
-      name: $('#customerName').value.trim(),
+      name: customerInput.value.trim(),
       listedPrice: $('#listedPrice').value,
       timeframe: $('#daysToSell').value,
       includeRenov,
-      propertyType: includeRenov ? ($('#propertyType')?.value || '') : '',
+      propertyType: includeRenov ? (propertyTypeSelect.value || '') : '',
       renovations: currentOffers.renovations || [],
       originalOffer: { bottom: currentOffers.bottom, top: currentOffers.top },
       adjustedOffer: { bottom: currentOffers.adjBottom, top: currentOffers.adjTop },
@@ -791,18 +806,13 @@
             <button class="del-btn">Del</button>
             <button class="copy-btn">Copy</button>`;
           div.querySelector('.del-btn').addEventListener('click', (ev)=>{
-            ev.stopPropagation();
-            if(!confirm('Delete this item?')) return;
+            ev.stopPropagation(); if(!confirm('Delete this item?')) return;
             items.splice(i,1); Storage.set(storageKey, items); render(); showToast('Deleted');
           });
           div.querySelector('.copy-btn').addEventListener('click', (ev)=>{
             ev.stopPropagation(); navigator.clipboard.writeText(e.script || e.content || ''); showToast('Copied');
           });
-          div.addEventListener('click',()=>{
-            overlayTitle.innerText = e.title;
-            overlayText.innerText = e.script || e.content || '';
-            overlay.style.display='flex';
-          });
+          div.addEventListener('click',()=>{ overlayTitle.innerText = e.title; overlayText.innerText = e.script || e.content || ''; overlay.style.display='flex'; });
           listDiv.appendChild(div);
         }
       });
@@ -837,10 +847,7 @@
             <button class="copy-btn">Copy</button>
             <button class="del-btn">Del</button>`;
           div.querySelector('.copy-btn').addEventListener('click', ()=>{ navigator.clipboard.writeText(e.content || ''); showToast('Copied'); });
-          div.querySelector('.del-btn').addEventListener('click', ()=>{
-            if(!confirm('Delete this item?')) return;
-            items.splice(i,1); Storage.set(storageKey, items); render(); showToast('Deleted');
-          });
+          div.querySelector('.del-btn').addEventListener('click', ()=>{ if(!confirm('Delete this item?')) return; items.splice(i,1); Storage.set(storageKey, items); render(); showToast('Deleted'); });
           listDiv.appendChild(div);
         }
       });
@@ -853,11 +860,7 @@
       render(); showToast('Saved');
     });
     searchInput.addEventListener('input', debounce(render, 160));
-    clearButton.addEventListener('click', ()=>{
-      if(!items.length) return showToast('Nothing to clear');
-      if(!confirm(`Clear ALL ${storageKey} items?`)) return;
-      items=[]; Storage.set(storageKey, items); render(); showToast('Cleared');
-    });
+    clearButton.addEventListener('click', ()=>{ if(!items.length) return showToast('Nothing to clear'); if(!confirm(`Clear ALL ${storageKey} items?`)) return; items=[]; Storage.set(storageKey, items); render(); showToast('Cleared'); });
     render();
   }
   setupTemplate('emails','newEmailTitle','newEmailContent','emailList','saveEmail','searchEmail','clearAllEmails');
@@ -877,81 +880,26 @@
   const clearValuationFormBtn = $('#clearValuationForm');
   let valuations = Storage.get('valuations');
 
-  function getValuationFromForm(){
-    const obj = {};
-    valuationFields.forEach(id => { const el = document.getElementById(id); obj[id] = el ? el.value.trim() : ''; });
-    obj.timestamp = new Date().toLocaleString();
-    return obj;
-  }
-  function clearValuationForm(){
-    valuationFields.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-    showToast('Valuation form cleared');
-  }
+  function getValuationFromForm(){ const obj = {}; valuationFields.forEach(id => { const el = document.getElementById(id); obj[id] = el ? el.value.trim() : ''; }); obj.timestamp = new Date().toLocaleString(); return obj; }
+  function clearValuationForm(){ valuationFields.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; }); showToast('Valuation form cleared'); }
   clearValuationFormBtn.addEventListener('click', clearValuationForm);
 
-  function valuationToPrettyText(v){
-    const line = (label, key) => `${label}: ${v[key] || ''}`;
-    return [
-      'VALUATION CHECKLIST',
-      line('Customer Name','val_customerName'),
-      line('First Line of Address','val_address1'),
-      line('Postcode','val_postcode'),
-      '',
-      line('Market Value / Listed Price','val_marketValue'),
-      line('Spread Offer Agreed','val_spreadOffer'),
-      line('Redemption Figure','val_redemption'),
-      line('Valuation Days','val_days'),
-      line('Required Reneg','val_requiredReneg'),
-      '',
-      'My Valuation / Justification:',
-      v['val_justification'] || '',
-      '',
-      'COMPARABLE 1',
-      line('URL','c1_url'),
-      line('Property Address','c1_address'),
-      line('Estate Agent','c1_agent'),
-      line('Listing Date (start–end)','c1_dates'),
-      line('Listing Price','c1_listPrice'),
-      line('Price Reductions','c1_reductions'),
-      line('Square Footage','c1_sqft'),
-      line('Estate Agent Notes','c1_agentNotes'),
-      line('Sold Price','c1_soldPrice'),
-      line('Date Offer Accepted','c1_offerDate'),
-      line('Number of Viewings','c1_viewings'),
-      line('Number of Offers','c1_offers'),
-      line('EA Opinion — Our Subject','c1_eaOpinion'),
-      '',
-      'COMPARABLE 2',
-      line('URL','c2_url'),
-      line('Property Address','c2_address'),
-      line('Estate Agent','c2_agent'),
-      line('Listing Date (start–end)','c2_dates'),
-      line('Listing Price','c2_listPrice'),
-      line('Price Reductions','c2_reductions'),
-      line('Square Footage','c2_sqft'),
-      line('Estate Agent Notes','c2_agentNotes'),
-      line('Sold Price','c2_soldPrice'),
-      line('Date Offer Accepted','c2_offerDate'),
-      line('Number of Viewings','c2_viewings'),
-      line('Number of Offers','c2_offers'),
-      line('EA Opinion — Our Subject','c2_eaOpinion'),
-      '',
-      'COMPARABLE 3',
-      line('URL','c3_url'),
-      line('Property Address','c3_address'),
-      line('Estate Agent','c3_agent'),
-      line('Listing Date (start–end)','c3_dates'),
-      line('Listing Price','c3_listPrice'),
-      line('Price Reductions','c3_reductions'),
-      line('Square Footage','c3_sqft'),
-      line('Estate Agent Notes','c3_agentNotes'),
-      line('Sold Price','c3_soldPrice'),
-      line('Date Offer Accepted','c3_offerDate'),
-      line('Number of Viewings','c3_viewings'),
-      line('Number of Offers','c3_offers'),
-      line('EA Opinion — Our Subject','c3_eaOpinion')
-    ].join('\n\n');
-  }
+  function valuationToPrettyText(v){ const line = (label, key) => `${label}: ${v[key] || ''}`; return [
+    'VALUATION CHECKLIST', line('Customer Name','val_customerName'), line('First Line of Address','val_address1'), line('Postcode','val_postcode'), '',
+    line('Market Value / Listed Price','val_marketValue'), line('Spread Offer Agreed','val_spreadOffer'), line('Redemption Figure','val_redemption'),
+    line('Valuation Days','val_days'), line('Required Reneg','val_requiredReneg'), '', 'My Valuation / Justification:', v['val_justification'] || '', '',
+    'COMPARABLE 1', line('URL','c1_url'), line('Property Address','c1_address'), line('Estate Agent','c1_agent'), line('Listing Date (start–end)','c1_dates'),
+    line('Listing Price','c1_listPrice'), line('Price Reductions','c1_reductions'), line('Square Footage','c1_sqft'), line('Estate Agent Notes','c1_agentNotes'),
+    line('Sold Price','c1_soldPrice'), line('Date Offer Accepted','c1_offerDate'), line('Number of Viewings','c1_viewings'), line('Number of Offers','c1_offers'),
+    line('EA Opinion — Our Subject','c1_eaOpinion'), '',
+    'COMPARABLE 2', line('URL','c2_url'), line('Property Address','c2_address'), line('Estate Agent','c2_agent'), line('Listing Date (start–end)','c2_dates'),
+    line('Listing Price','c2_listPrice'), line('Price Reductions','c2_reductions'), line('Square Footage','c2_sqft'), line('Estate Agent Notes','c2_agentNotes'),
+    line('Sold Price','c2_soldPrice'), line('Date Offer Accepted','c2_offerDate'), line('Number of Viewings','c2_viewings'), line('Number of Offers','c2_offers'),
+    line('EA Opinion — Our Subject','c2_eaOpinion'), '',
+    'COMPARABLE 3', line('URL','c3_url'), line('Property Address','c3_address'), line('Estate Agent','c3_agent'), line('Listing Date (start–end)','c3_dates'),
+    line('Listing Price','c3_listPrice'), line('Price Reductions','c3_reductions'), line('Square Footage','c3_sqft'), line('Estate Agent Notes','c3_agentNotes'),
+    line('Sold Price','c3_soldPrice'), line('Date Offer Accepted','c3_offerDate'), line('Number of Viewings','c3_viewings'), line('Number of Offers','c3_offers'),
+    line('EA Opinion — Our Subject','c3_eaOpinion') ].join('\n\n'); }
 
   function renderValuations(){
     const search = (valSearch.value || '').toLowerCase();
@@ -975,192 +923,48 @@
           overlay.style.display='flex';
         });
         div.querySelector('.copy-btn').addEventListener('click', (ev)=>{
-          ev.stopPropagation();
-          navigator.clipboard.writeText(valuationToPrettyText(v));
-          showToast('Valuation copied');
+          ev.stopPropagation(); navigator.clipboard.writeText(valuationToPrettyText(v)); showToast('Valuation copied');
         });
         div.querySelector('.del-btn').addEventListener('click', (ev)=>{
-          ev.stopPropagation();
-          if(!confirm('Delete this valuation?')) return;
-          valuations.splice(i,1);
-          Storage.set('valuations', valuations);
-          renderValuations();
-          showToast('Deleted');
+          ev.stopPropagation(); if(!confirm('Delete this valuation?')) return;
+          valuations.splice(i,1); Storage.set('valuations', valuations); renderValuations(); showToast('Deleted');
         });
         valuationList.appendChild(div);
       }
     });
   }
-
-  saveValuationBtn.addEventListener('click', ()=>{
-    const v = getValuationFromForm();
-    if(!v.val_customerName){ return showToast('Add a Customer Name before saving'); }
-    valuations.push(v);
-    Storage.set('valuations', valuations);
-    renderValuations();
-    showToast('Valuation saved');
-  });
-
+  saveValuationBtn.addEventListener('click', ()=>{ const v = getValuationFromForm(); if(!v.val_customerName){ return showToast('Add a Customer Name before saving'); } valuations.push(v); Storage.set('valuations', valuations); renderValuations(); showToast('Valuation saved'); });
   valSearch.addEventListener('input', debounce(renderValuations, 160));
-  clearAllValuationsBtn.addEventListener('click', ()=>{
-    if(!valuations.length) return showToast('Nothing to clear');
-    if(!confirm('Clear ALL valuations?')) return;
-    valuations = [];
-    Storage.set('valuations', valuations);
-    renderValuations();
-    showToast('All valuations cleared');
-  });
+  clearAllValuationsBtn.addEventListener('click', ()=>{ if(!valuations.length) return showToast('Nothing to clear'); if(!confirm('Clear ALL valuations?')) return; valuations = []; Storage.set('valuations', valuations); renderValuations(); showToast('All valuations cleared'); });
   renderValuations();
 
   // Export backup (includes valuations, not PDFs)
-  exportBtn.addEventListener('click', ()=>{
-    const data = {
-      hsdSaved: Storage.get('hsdSaved'),
-      emails: Storage.get('emails'),
-      smsTemplates: Storage.get('smsTemplates'),
-      objections: Storage.get('objections'),
-      scripts: Storage.get('scripts'),
-      valuations: Storage.get('valuations')
-    };
-    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'HSD_Backup.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-    showToast('Backup exported');
-  });
+  exportBtn.addEventListener('click', ()=>{ const data = { hsdSaved: Storage.get('hsdSaved'), emails: Storage.get('emails'), smsTemplates: Storage.get('smsTemplates'), objections: Storage.get('objections'), scripts: Storage.get('scripts'), valuations: Storage.get('valuations') }; const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'HSD_Backup.json'; a.click(); URL.revokeObjectURL(a.href); showToast('Backup exported'); });
 
-  // Theme toggle
+  // Theme
   const THEME_KEY = 'hsd_theme';
-  function setTheme(mode){
-    document.documentElement.setAttribute('data-theme', mode);
-    localStorage.setItem(THEME_KEY, mode);
-    themeToggle.textContent = mode === 'dark' ? '☀️' : '🌙';
-  }
+  function setTheme(mode){ document.documentElement.setAttribute('data-theme', mode); localStorage.setItem(THEME_KEY, mode); themeToggle.textContent = mode === 'dark' ? '☀️' : '🌙'; }
   const savedTheme = localStorage.getItem(THEME_KEY) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   setTheme(savedTheme);
   themeToggle.addEventListener('click', ()=> setTheme(document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark'));
 
   // Collapsible comparables: only one open
   const comps = ['comp1','comp2','comp3'].map(id=>document.getElementById(id));
-  comps.forEach(d=>{
-    d.addEventListener('toggle', ()=>{
-      if(d.open){ comps.forEach(other=>{ if(other!==d) other.removeAttribute('open'); }); }
-    });
-  });
+  comps.forEach(d=>{ d.addEventListener('toggle', ()=>{ if(d.open){ comps.forEach(other=>{ if(other!==d) other.removeAttribute('open'); }); } }); });
 
   // ======= SCRIPTS - PDF STORAGE (IndexedDB) =======
   const DB_NAME = 'hsd_pdf_db';
   const DB_STORE = 'pdfs';
   let db;
-  function openDB(){
-    return new Promise((resolve, reject)=>{
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = (e)=>{
-        db = e.target.result;
-        if(!db.objectStoreNames.contains(DB_STORE)){
-          db.createObjectStore(DB_STORE, { keyPath:'id', autoIncrement:true });
-        }
-      };
-      req.onsuccess = (e)=>{ db = e.target.result; resolve(db); };
-      req.onerror = (e)=> reject(e);
-    });
-  }
-  async function dbAddPDF(name, blob){
-    await openDB();
-    return new Promise((resolve, reject)=>{
-      const tx = db.transaction(DB_STORE, 'readwrite');
-      const store = tx.objectStore(DB_STORE);
-      const now = new Date().toISOString();
-      const req = store.add({ name, blob, createdAt: now });
-      req.onsuccess = ()=> resolve(req.result);
-      req.onerror = (e)=> reject(e);
-    });
-  }
-  async function dbGetAllPDFs(){
-    await openDB();
-    return new Promise((resolve, reject)=>{
-      const tx = db.transaction(DB_STORE, 'readonly');
-      const store = tx.objectStore(DB_STORE);
-      const req = store.getAll();
-      req.onsuccess = ()=> resolve(req.result || []);
-      req.onerror = (e)=> reject(e);
-    });
-  }
-  async function dbDeletePDF(id){
-    await openDB();
-    return new Promise((resolve, reject)=>{
-      const tx = db.transaction(DB_STORE, 'readwrite');
-      const store = tx.objectStore(DB_STORE);
-      const req = store.delete(id);
-      req.onsuccess = ()=> resolve();
-      req.onerror = (e)=> reject(e);
-    });
-  }
-  async function renderPDFs(){
-    const search = (searchPdfs.value || '').toLowerCase();
-    const items = await dbGetAllPDFs();
-    pdfList.innerHTML = '';
-    items
-      .filter(item => !search || item.name.toLowerCase().includes(search))
-      .forEach(item => {
-        const div = document.createElement('div'); div.className = 'saved-entry';
-        div.innerHTML = `
-          <div style="font-weight:600">${item.name}</div>
-          <small style="opacity:.8">${new Date(item.createdAt).toLocaleString()}</small>
-          <button class="del-btn">Del</button>
-        `;
-        div.addEventListener('click', async (ev)=>{
-          if(ev.target.closest('button')) return;
-          const blob = item.blob;
-          const url = URL.createObjectURL(blob);
-          pdfOverlayTitle.textContent = item.name;
-          pdfOverlayFrame.src = url + '#view=FitH';
-          downloadPdfBtn.onclick = ()=>{
-            const a = document.createElement('a');
-            a.href = url; a.download = item.name || 'script.pdf'; a.click();
-          };
-          openPdfNewTabBtn.onclick = ()=> window.open(url, '_blank');
-          pdfOverlay.style.display = 'flex';
-        });
-        div.querySelector('.del-btn').addEventListener('click', async (ev)=>{
-          ev.stopPropagation();
-          if(!confirm('Delete this PDF?')) return;
-          await dbDeletePDF(item.id);
-          renderPDFs();
-          showToast('PDF deleted');
-        });
-        pdfList.appendChild(div);
-      });
-  }
+  function openDB(){ return new Promise((resolve, reject)=>{ const req = indexedDB.open(DB_NAME, 1); req.onupgradeneeded = (e)=>{ db = e.target.result; if(!db.objectStoreNames.contains(DB_STORE)){ db.createObjectStore(DB_STORE, { keyPath:'id', autoIncrement:true }); } }; req.onsuccess = (e)=>{ db = e.target.result; resolve(db); }; req.onerror = (e)=> reject(e); }); }
+  async function dbAddPDF(name, blob){ await openDB(); return new Promise((resolve, reject)=>{ const tx = db.transaction(DB_STORE, 'readwrite'); const store = tx.objectStore(DB_STORE); const now = new Date().toISOString(); const req = store.add({ name, blob, createdAt: now }); req.onsuccess = ()=> resolve(req.result); req.onerror = (e)=> reject(e); }); }
+  async function dbGetAllPDFs(){ await openDB(); return new Promise((resolve, reject)=>{ const tx = db.transaction(DB_STORE, 'readonly'); const store = tx.objectStore(DB_STORE); const req = store.getAll(); req.onsuccess = ()=> resolve(req.result || []); req.onerror = (e)=> reject(e); }); }
+  async function dbDeletePDF(id){ await openDB(); return new Promise((resolve, reject)=>{ const tx = db.transaction(DB_STORE, 'readwrite'); const store = tx.objectStore(DB_STORE); const req = store.delete(id); req.onsuccess = ()=> resolve(); req.onerror = (e)=> reject(e); }); }
+  async function renderPDFs(){ const search = (searchPdfs.value || '').toLowerCase(); const items = await dbGetAllPDFs(); pdfList.innerHTML = ''; items.filter(item => !search || item.name.toLowerCase().includes(search)).forEach(item => { const div = document.createElement('div'); div.className = 'saved-entry'; div.innerHTML = ` <div style="font-weight:600">${item.name}</div> <small style="opacity:.8">${new Date(item.createdAt).toLocaleString()}</small> <button class="del-btn">Del</button> `; div.addEventListener('click', async (ev)=>{ if(ev.target.closest('button')) return; const blob = item.blob; const url = URL.createObjectURL(blob); pdfOverlayTitle.textContent = item.name; pdfOverlayFrame.src = url + '#view=FitH'; downloadPdfBtn.onclick = ()=>{ const a = document.createElement('a'); a.href = url; a.download = item.name || 'script.pdf'; a.click(); }; openPdfNewTabBtn.onclick = ()=> window.open(url, '_blank'); pdfOverlay.style.display = 'flex'; }); div.querySelector('.del-btn').addEventListener('click', async (ev)=>{ ev.stopPropagation(); if(!confirm('Delete this PDF?')) return; await dbDeletePDF(item.id); renderPDFs(); showToast('PDF deleted'); }); pdfList.appendChild(div); }); }
   uploadPdfBtn.addEventListener('click', ()=> pdfInput.click());
-  pdfInput.addEventListener('change', async ()=>{
-    const files = Array.from(pdfInput.files || []);
-    if(!files.length) return;
-    for(const f of files){
-      if(f.type !== 'application/pdf'){ showToast('Only PDF files allowed'); continue; }
-      if(f.size > 100 * 1024 * 1024){ showToast('PDF too large (>100MB)'); continue; }
-      await dbAddPDF(f.name, f);
-    }
-    pdfInput.value = '';
-    await renderPDFs();
-    showToast('PDF(s) uploaded');
-  });
-  clearAllPdfsBtn.addEventListener('click', async ()=>{
-    if(!confirm('Clear ALL uploaded PDFs?')) return;
-    await openDB();
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).clear();
-    tx.oncomplete = ()=>{
-      renderPDFs();
-      showToast('All PDFs cleared');
-    };
-  });
-  closePdfOverlay.addEventListener('click', ()=>{
-    pdfOverlayFrame.src = 'about:blank';
-    pdfOverlay.style.display = 'none';
-  });
+  pdfInput.addEventListener('change', async ()=>{ const files = Array.from(pdfInput.files || []); if(!files.length) return; for(const f of files){ if(f.type !== 'application/pdf'){ showToast('Only PDF files allowed'); continue; } if(f.size > 100 * 1024 * 1024){ showToast('PDF too large (>100MB)'); continue; } await dbAddPDF(f.name, f); } pdfInput.value = ''; await renderPDFs(); showToast('PDF(s) uploaded'); });
+  clearAllPdfsBtn.addEventListener('click', async ()=>{ if(!confirm('Clear ALL uploaded PDFs?')) return; await openDB(); const tx = db.transaction(DB_STORE, 'readwrite'); tx.objectStore(DB_STORE).clear(); tx.oncomplete = ()=>{ renderPDFs(); showToast('All PDFs cleared'); }; });
+  closePdfOverlay.addEventListener('click', ()=>{ pdfOverlayFrame.src = 'about:blank'; pdfOverlay.style.display = 'none'; });
   searchPdfs.addEventListener('input', debounce(renderPDFs, 150));
   renderPDFs();
 
@@ -1172,9 +976,7 @@
       if (error) { console.error(error); return; }
       const local = Storage.get('hsdSaved') || [];
       if ((!cloudSample || cloudSample.length === 0) && local.length) {
-        for (const entry of local) {
-          try { await Backend.saveCalculation(entry); } catch(e){ console.error('import failed', e); }
-        }
+        for (const entry of local) { try { await Backend.saveCalculation(entry); } catch(e){ console.error('import failed', e); } }
         Storage.set('hsdSaved', []);
         showToast('Imported your local calculations to cloud');
       }
@@ -1184,3 +986,4 @@
 </script>
 </body>
 </html>
+
