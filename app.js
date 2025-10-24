@@ -409,7 +409,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     };
     try{
       if (!(await ensureSignedInOrLocal())) throw new Error("Not signed in");
-      const { error } = await supabase.from("calculations").insert({ data: row });
+        const u = await getUser();
+        const { error } = await supabase.from("calculations")
+          .insert({ user_id: u.id, data: row });
+        if (error) console.error(error);
+
       if (error) throw error;
       setMsg(saveMsg, "Saved to cloud", "ok");
       toast("Saved to cloud");
