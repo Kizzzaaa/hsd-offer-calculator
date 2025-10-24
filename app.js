@@ -24,6 +24,7 @@ function requireSupabase(){
 const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
 let supabase;
+let realtimeSub = null;   // <-- realtime channel handle
 
 // --- Elements (assigned on DOMContentLoaded) ---
 let email,password,signupBtn,signinBtn,signoutBtn,who,authMsg;
@@ -154,11 +155,13 @@ function renderList(){
       if(!confirm("Delete this saved calculation?")) return;
       const r=saved[i];
       try{
-        if(r.id){
+        // Optimistic remove
+        if (r.id) {
+          saved.splice(i,1); renderList();
           const { error } = await supabase.from("calculations").delete().eq("id", r.id);
           if(error) throw error;
-          await syncFromCloud(); toast("Deleted from cloud");
-        }else{
+          toast("Deleted from cloud");
+        } else {
           saved.splice(i,1); Storage.set("hsdSaved",saved); renderList(); toast("Deleted locally");
         }
       }catch(e){ toast("Delete failed"); console.error(e); }
@@ -185,6 +188,52 @@ async function syncFromCloud(){
     saved=Storage.get("hsdSaved")||[];
     renderList();
   }
+}
+
+// --- Realtime ---
+async function subscribeToRealtime(){
+  const u = await getUser();
+  if (!u) return;
+
+  // Reset any existing
+  if (realtimeSub) { try { supabase.removeChannel(realtimeSub); } catch {} realtimeSub = null; }
+
+  realtimeSub = supabase
+    .channel(`calcs:${u.id}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'calculations', filter: `user_id=eq.${u.id}` },
+      (payload) => {
+        try {
+          if (payload.eventType === 'INSERT') {
+            const r = payload.new;
+            const row = { ...(r.data || {}), id: r.id, timestamp: r.data?.timestamp || r.created_at };
+            if (!saved.find(s => s.id === row.id)) {
+              saved.unshift(row);
+              renderList();
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const r = payload.new;
+            const row = { ...(r.data || {}), id: r.id, timestamp: r.data?.timestamp || r.updated_at || r.created_at };
+            const idx = saved.findIndex(s => s.id === r.id);
+            if (idx > -1) saved[idx] = row; else saved.unshift(row);
+            renderList();
+          } else if (payload.eventType === 'DELETE') {
+            const id = payload.old?.id;
+            if (id) {
+              saved = saved.filter(s => s.id !== id);
+              renderList();
+            }
+          }
+        } catch (e) {
+          console.warn('Realtime handler error:', e);
+        }
+      }
+    )
+    .subscribe();
+}
+function unsubscribeRealtime(){
+  if (realtimeSub) { try { supabase.removeChannel(realtimeSub); } catch {} realtimeSub = null; }
 }
 
 // --- Templates (local only) ---
@@ -249,6 +298,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   await paintAuth();
   setInterval(paintAuth, 2000);
 
+  // Start realtime if already signed in (e.g., returning user)
+  await subscribeToRealtime();
+
   // --- Auth actions ---
   if(signupBtn) signupBtn.addEventListener("click", async ()=>{
     if(!email?.value || !password?.value) return setMsg(authMsg,"Enter email & password","error");
@@ -270,7 +322,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       setMsg(authMsg,"Signed in","ok"); toast("Signed in");
 
       await updateWho();
-      await paintAuth();           // ✅ repaint after sign-in
+      await paintAuth();           // repaint after sign-in
+      await subscribeToRealtime(); // start realtime
       await syncFromCloud();
     }catch(e){
       console.error("signIn error:",e);
@@ -284,19 +337,24 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   if(signoutBtn) signoutBtn.addEventListener("click", async ()=>{
     try{
       await supabase.auth.signOut();
+      unsubscribeRealtime();       // stop realtime
       toast("Signed out");
       saved=Storage.get("hsdSaved")||[]; renderList();
       await updateWho();
-      await paintAuth();           // ✅ repaint after sign-out
+      await paintAuth();           // repaint after sign-out
     }catch(e){ console.error("signOut error:",e); setMsg(authMsg,e?.message||"Sign-out failed","error"); }
   });
 
   supabase.auth.onAuthStateChange(async (event)=>{
     await updateWho();
-    await paintAuth();             // ✅ repaint on any auth event
+    await paintAuth();             // repaint on any auth event
     if(event==="SIGNED_IN" || event==="TOKEN_REFRESHED"){
+      await subscribeToRealtime(); // (re)subscribe when token/session changes
       setMsg(authMsg,"Signed in","ok");
       await syncFromCloud();
+    }
+    if(event==="SIGNED_OUT"){
+      unsubscribeRealtime();
     }
   });
 
@@ -332,7 +390,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     currentOffers=null;
   });
 
-  // --- Save calc (with RLS-friendly insert) ---
+  // --- Save calc (optimistic + RLS-friendly insert) ---
   if(saveBtn) saveBtn.addEventListener("click", async ()=>{
     if(!customer?.value?.trim()) { toast("Enter customer name first"); return; }
     if(!currentOffers) { toast("Calculate offer first"); return; }
@@ -366,7 +424,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         throw insErr;
       }
 
+      // ✅ Optimistic add to top of list
+      const savedRow = { ...row, id: inserted.id, timestamp: row.timestamp };
+      saved.unshift(savedRow);
+      renderList();
+
       setMsg(saveMsg,"Saved to cloud","ok"); toast("Saved to cloud");
+
+      // Optional: ensure order matches server
       await syncFromCloud();
     }catch(e){
       console.warn("Cloud save failed, saving locally:",e);
