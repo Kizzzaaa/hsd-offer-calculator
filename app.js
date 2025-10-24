@@ -34,6 +34,7 @@ const days = $("#days");
 const calcBtn = $("#calc");
 const clearBtn = $("#clear");
 const result = $("#result");
+
 const renoTypeWrap = $("#renoTypeWrap");
 const renoOptions = $("#renoOptions");
 const ptype = $("#ptype");
@@ -89,7 +90,6 @@ signupBtn.addEventListener("click", async () => {
     setMsg(authMsg, e.message || "Sign-up failed", "error");
   }
 });
-
 signinBtn.addEventListener("click", async () => {
   if(!email.value || !password.value) return setMsg(authMsg, "Enter email & password", "error");
   try {
@@ -110,7 +110,6 @@ signinBtn.addEventListener("click", async () => {
     }
   }
 });
-
 signoutBtn.addEventListener("click", async () => {
   try {
     await supabase.auth.signOut();
@@ -120,7 +119,6 @@ signoutBtn.addEventListener("click", async () => {
     setMsg(authMsg, e?.message || "Sign-out failed", "error");
   }
 });
-
 // Keep UI in sync with auth changes
 supabase.auth.onAuthStateChange(async () => {
   await updateWho();
@@ -181,10 +179,15 @@ function calculate() {
 
   const d = parseInt(days.value, 10);
   let baseBottom, baseTop;
-  if (d === 180){ baseTop = listed*0.95; baseBottom = baseTop - spread(listed); }
-  else if (d === 90){ baseBottom = listed*0.90; baseTop = baseBottom + spread(listed); }
-  else if (d === 30){ baseBottom = listed*0.80; baseTop = baseBottom + spread(listed); }
-  else { baseBottom = listed*0.70; baseTop = baseBottom + spread(listed); }
+
+  // ✅ Expectations logic (180): Top = listed; Bottom = listed - required spread
+  if (d === 180) {
+    baseTop = listed;
+    baseBottom = listed - spread(listed);
+  }
+  else if (d === 90) { baseBottom = listed*0.90; baseTop = baseBottom + spread(listed); }
+  else if (d === 30) { baseBottom = listed*0.80; baseTop = baseBottom + spread(listed); }
+  else {               baseBottom = listed*0.70; baseTop = baseBottom + spread(listed); }
 
   let bottom = round1k(baseBottom), top = round1k(baseTop);
   if (bottom<0) bottom=0; if (top<0) top=0;
@@ -198,23 +201,21 @@ function calculate() {
 
   const adjBottom = Math.max(0, round1k(bottom - total));
   const adjTop = Math.max(0, round1k(top - total));
-  currentOffers = { bottom, top, adjBottom, adjTop, renovations: selected };
 
+  currentOffers = { bottom, top, adjBottom, adjTop, renovations: selected };
   const adjGood = adjBottom >= bottom;
+
   result.innerHTML = `
     <div class="pill base">Original: £${bottom.toLocaleString()} – £${top.toLocaleString()}</div>
     ${ total>0 ? `<div style="margin-top:6px">Renovation Costs: £${total.toLocaleString()}</div>` : "" }
-    <div class="pill adj ${adjGood?'good':''}" style="display:block; margin-top:8px">
+    <div class="pill adj ${adjGood?'good':'bad'}" style="display:block; margin-top:8px">
       Adjusted: £${adjBottom.toLocaleString()} – £${adjTop.toLocaleString()}
     </div>
   `;
 }
 
 calcBtn.addEventListener("click", calculate);
-price.addEventListener("input", () => { // live calc (no need to toggle reno)
-  // slight debounce not strictly needed here
-  calculate();
-});
+price.addEventListener("input", () => { calculate(); });
 days.addEventListener("change", calculate);
 // initial calc
 setTimeout(calculate, 0);
@@ -341,7 +342,6 @@ saveBtn.addEventListener("click", async ()=>{
 });
 
 search.addEventListener("input", renderList);
-
 clearAll.addEventListener("click", ()=>{
   if(!saved.length) return toast("Nothing to clear");
   if(!confirm("Clear ALL saved calculations (local only)?")) return;
