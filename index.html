@@ -86,50 +86,11 @@
     }
   </style>
 
-  <!-- Supabase must load BEFORE your app -->
+  <!-- Load Supabase BEFORE your app -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
 
-  <!-- Minimal watchdog + session debug that doesn't depend on app.js -->
-  <script>
-    window.addEventListener('DOMContentLoaded', async () => {
-      if (!window.supabase || !window.supabase.createClient) {
-        console.error('Supabase SDK missing');
-        return;
-      }
-      // Mirror your app config (must match app.js)
-      const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
-      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
-      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-      });
-
-      async function paintSession() {
-        try {
-          const { data } = await client.auth.getSession();
-          const u = data?.session?.user || null;
-          const who = document.getElementById('who');
-          const dbg = document.getElementById('authDebug');
-          if (who) who.textContent = u ? `Signed in as ${u.email}` : 'Not signed in';
-          if (dbg) dbg.textContent = u ? `session: ${u.email}` : 'session: null';
-        } catch (e) {
-          console.warn('paintSession error', e);
-        }
-      }
-
-      // Paint once on load
-      paintSession();
-
-      // Keep in sync with any auth changes (even before app.js runs)
-      client.auth.onAuthStateChange(async () => {
-        paintSession();
-      });
-      // Expose just for quick console checks
-      window.__sb_watchdog = client;
-    });
-  </script>
-
-  <!-- Your app code (cache-busted so the newest JS is used) -->
-  <script defer src="/app.js?v=11"></script>
+  <!-- Your app code (cache-busted to ensure the latest JS loads) -->
+  <script defer src="/app.js?v=12"></script>
 </head>
 <body>
   <div class="flex-container">
@@ -155,7 +116,7 @@
         </div>
         <div class="hint" id="who">Not signed in</div>
         <div class="msg" id="authMsg" aria-live="polite"></div>
-        <!-- Debug session label -->
+        <!-- Debug session label (updated by app.js heartbeat) -->
         <div id="authDebug" class="msg" style="opacity:.7"></div>
       </div>
 
