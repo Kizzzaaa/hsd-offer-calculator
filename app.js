@@ -57,29 +57,10 @@ const Storage={
   set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))
 };
 
-// --- Auth helpers (use session for reliability) ---
-async function getUser(){
+// --- Session helpers ---
+async function getSessionUser(){
   const { data } = await supabase.auth.getSession();
   return data?.session?.user || null;
-}
-async function updateWho(){
-  const u = await getUser();
-  if(who) who.textContent = u ? `Signed in as ${u.email}` : "Not signed in";
-  setMsg(authMsg,"","");
-}
-
-// ✅ Paint the auth state into UI (label + debug) no matter what
-async function paintAuth(){
-  try{
-    const { data } = await supabase.auth.getSession();
-    const u = data?.session?.user || null;
-    const whoEl = document.getElementById("who");
-    const dbgEl = document.getElementById("authDebug");
-    if (whoEl) whoEl.textContent = u ? `Signed in as ${u.email}` : "Not signed in";
-    if (dbgEl) dbgEl.textContent = u ? `session: ${u.email}` : "session: null";
-  }catch(e){
-    console.warn("paintAuth error:", e);
-  }
 }
 
 // --- Calculator utils ---
@@ -127,7 +108,7 @@ function calculate(){
     </div>`;
 }
 
-// --- Merge helper so server results don't wipe optimistic items ---
+// --- Merge helper (keep optimistic items) ---
 function mergeServerRowsIntoSaved(serverRows){
   const byId = new Map(saved.map(r => [r.id || `local-${r.timestamp}`, r]));
   serverRows.forEach(r => {
@@ -165,7 +146,7 @@ function renderList(){
       if(!confirm("Delete this saved calculation?")) return;
       const r=saved[i];
 
-      // Optimistic remove
+      // Optimistic remove + rollback on error
       const backup = saved.slice();
       saved.splice(i,1);
       renderList();
@@ -182,7 +163,7 @@ function renderList(){
       }catch(e){
         console.error("Delete failed:", e);
         toast("Delete failed");
-        saved = backup; // rollback UI
+        saved = backup;
         renderList();
       }
     });
@@ -190,21 +171,66 @@ function renderList(){
   });
 }
 
+// --- Pull from the right source + paint UI (SINGLE SOURCE OF TRUTH) ---
+async function renderAuthUI(){
+  const user = await getSessionUser();
+
+  // Labels / debug
+  if (who) who.textContent = user ? `Signed in as ${user.email}` : "Not signed in";
+  const dbgEl = document.getElementById("authDebug");
+  if (dbgEl) dbgEl.textContent = user ? `session: ${user.email}` : "session: null";
+
+  // Toggle buttons & save availability
+  if (signinBtn)  signinBtn.disabled  = !!user;
+  if (signupBtn)  signupBtn.disabled  = !!user;
+  if (signoutBtn) signoutBtn.disabled = !user;
+  if (saveBtn)    saveBtn.disabled    = !user;
+  if (saveBtn)    saveBtn.title       = user ? "" : "Sign in to save to cloud";
+
+  // Make sure any search filter doesn't hide new items after auth flips
+  if (search && search.value) search.value = "";
+
+  // Data source
+  if (user) {
+    try{
+      const res=await supabase.from("calculations")
+        .select("id, data, created_at")
+        .order("created_at",{ascending:false});
+      if(res.error) throw res.error;
+      const server=(res.data||[]).map(r=>({
+        ...(r.data||{}),
+        id:r.id,
+        timestamp:(r.data && r.data.timestamp) || r.created_at
+      }));
+      mergeServerRowsIntoSaved(server);
+    }catch(e){
+      console.warn("renderAuthUI cloud pull failed:", e);
+    }
+  } else {
+    saved = Storage.get("hsdSaved") || [];
+  }
+
+  renderList();
+}
+
+// --- Thin wrapper kept for compatibility with your code paths ---
+async function paintAuth(){ try{ await renderAuthUI(); }catch(e){ console.warn("paintAuth error:", e); } }
+
+// --- Sync helper used in a few places ---
 async function syncFromCloud(){
   try{
-    const u=await getUser();
+    const u=await getSessionUser();
     if(u){
       const res=await supabase.from("calculations").select("id, data, created_at").order("created_at",{ascending:false});
-      if(res.error){ console.error("select calculations error:",res.error); throw res.error; }
-      const server = (res.data||[]).map(r => ({ ...r.data, id:r.id, timestamp:r.data?.timestamp || r.created_at }));
-      mergeServerRowsIntoSaved(server); // <— do NOT clobber optimistic
+      if(res.error) throw res.error;
+      const server=(res.data||[]).map(r=>({ ...r.data, id:r.id, timestamp:r.data?.timestamp || r.created_at }));
+      mergeServerRowsIntoSaved(server);
     }else{
       saved=Storage.get("hsdSaved")||[];
     }
     renderList();
   }catch(e){
     console.error("syncFromCloud failed:",e);
-    // keep whatever we already have (optimistic/local) and just render
     toast("Cloud sync failed — showing local/optimistic");
     if(!saved.length) saved=Storage.get("hsdSaved")||[];
     renderList();
@@ -213,7 +239,7 @@ async function syncFromCloud(){
 
 // --- Realtime ---
 async function subscribeToRealtime(){
-  const u = await getUser();
+  const u = await getSessionUser();
   if (!u) return;
 
   if (realtimeSub) { try { supabase.removeChannel(realtimeSub); } catch {} realtimeSub = null; }
@@ -240,10 +266,7 @@ async function subscribeToRealtime(){
             renderList();
           } else if (payload.eventType === 'DELETE') {
             const id = payload.old?.id;
-            if (id) {
-              saved = saved.filter(s => s.id !== id);
-              renderList();
-            }
+            if (id) { saved = saved.filter(s => s.id !== id); renderList(); }
           }
         } catch (e) {
           console.warn('Realtime handler error:', e);
@@ -314,11 +337,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false }
   });
 
-  // 🔁 Heartbeat to keep "Signed in as..." always accurate
-  await paintAuth();
-  setInterval(paintAuth, 2000);
-
-  // Start realtime if already signed in (e.g., returning user)
+  // Initial UI paint + realtime (if already signed in)
+  await renderAuthUI();
   await subscribeToRealtime();
 
   // --- Auth actions ---
@@ -340,10 +360,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if(who && data?.user?.email) who.textContent=`Signed in as ${data.user.email}`;
       setMsg(authMsg,"Signed in","ok"); toast("Signed in");
 
-      await updateWho();
-      await paintAuth();
+      await renderAuthUI();
       await subscribeToRealtime();
-      await syncFromCloud();
     }catch(e){
       console.error("signIn error:",e);
       const m=String(e?.message||"").toLowerCase();
@@ -358,19 +376,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       await supabase.auth.signOut();
       unsubscribeRealtime();
       toast("Signed out");
-      saved=Storage.get("hsdSaved")||[]; renderList();
-      await updateWho();
-      await paintAuth();
+      await renderAuthUI(); // switches to local + repaints UI
     }catch(e){ console.error("signOut error:",e); setMsg(authMsg,e?.message||"Sign-out failed","error"); }
   });
 
   supabase.auth.onAuthStateChange(async (event)=>{
-    await updateWho();
-    await paintAuth();
+    await renderAuthUI();
     if(event==="SIGNED_IN" || event==="TOKEN_REFRESHED"){
       await subscribeToRealtime();
-      setMsg(authMsg,"Signed in","ok");
-      await syncFromCloud();
     }
     if(event==="SIGNED_OUT"){
       unsubscribeRealtime();
@@ -409,7 +422,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     currentOffers=null;
   });
 
-  // --- Save calc (optimistic + merge + search-clear) ---
+  // --- Save calc (optimistic + merge + unfilter) ---
   if(saveBtn) saveBtn.addEventListener("click", async ()=>{
     if(!customer?.value?.trim()) { toast("Enter customer name first"); return; }
     if(!currentOffers) { toast("Calculate offer first"); return; }
@@ -428,7 +441,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     };
 
     try{
-      const u=await getUser();
+      const u=await getSessionUser();
       if(!u){ setMsg(saveMsg,"Not signed in","error"); return; }
 
       const { data: inserted, error: insErr } = await supabase
@@ -437,29 +450,19 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         .select("id, created_at")
         .single();
 
-      if(insErr){
-        console.error("Insert error:",insErr);
-        setMsg(saveMsg,`Cloud save failed: ${insErr.message || insErr.code}`,"error");
-        throw insErr;
-      }
+      if(insErr) throw insErr;
 
-      // ✅ Clear search so the new row is visible even if a filter was active
-      if (search && search.value) { search.value = ""; }
-
-      // ✅ Optimistic add to top
+      if (search && search.value) search.value = ""; // ensure visible
       const savedRow = { ...row, id: inserted.id, timestamp: row.timestamp };
       saved.unshift(savedRow);
       renderList();
 
       setMsg(saveMsg,"Saved to cloud","ok"); toast("Saved to cloud");
-
-      // Merge with server truth but NEVER wipe the optimistic row
       await syncFromCloud();
     }catch(e){
       console.warn("Cloud save failed, saving locally:",e);
       if(!saveMsg.textContent) setMsg(saveMsg,`Saved locally (${e?.message || "unknown error"})`,"error");
-
-      if (search && search.value) { search.value = ""; } // ensure visible
+      if (search && search.value) search.value = "";
       const local=Storage.get("hsdSaved")||[];
       local.unshift(row); Storage.set("hsdSaved",local); saved=local; renderList();
     }
@@ -488,8 +491,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   setupList('smsTemplates',newSMSTitle,newSMSContent,smsList,saveSMS,searchSMS,clearAllSMS);
   setupList('objections',newObjTitle,newObjContent,objList,saveObj,searchObj,{addEventListener:()=>{},value:''});
 
-  // Initial sync + render
-  try{ await syncFromCloud(); }catch{}
+  // First calc render
   calculate();
 });
 
