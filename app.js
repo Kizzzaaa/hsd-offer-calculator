@@ -1,7 +1,7 @@
 // --- Small helpers ---
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
-const toastEl = $("#toast");
+let toastEl;
 function toast(text) { if(!toastEl) return; toastEl.textContent = text; toastEl.style.display = "block"; setTimeout(()=> toastEl.style.display="none", 1800); }
 function setMsg(el, text, kind) { if(!el) return; el.textContent = text || ""; el.className = "msg" + (kind ? " " + kind : ""); }
 function fmtMoneyInput(el){
@@ -13,66 +13,28 @@ function fmtMoneyInput(el){
   });
 }
 
-// --- Supabase init ---
+// --- Supabase init (guard for CDN) ---
+function requireSupabase() {
+  if (!window.supabase || !window.supabase.createClient) {
+    console.error("Supabase SDK not found. Add <script src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'></script> before this script.");
+    alert("App error: Supabase SDK not loaded. Check your HTML includes the supabase-js CDN.");
+    throw new Error("Supabase SDK missing");
+  }
+}
+
 const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-});
+let supabase;
 
-// --- Elements (auth) ---
-const email = $("#email");
-const password = $("#password");
-const signupBtn = $("#signup");
-const signinBtn = $("#signin");
-const signoutBtn = $("#signout");
-const who = $("#who");
-const authMsg = $("#authMsg");
-
-// --- Elements (calc) ---
-const customer = $("#customer");
-const price = $("#price");
-const days = $("#days");
-const calcBtn = $("#calc");
-const clearBtn = $("#clear");
-const result = $("#result");
-
-// Renovations
-const renoTypeWrap = $("#renoTypeWrap");
-const renoOptions = $("#renoOptions");
-const ptype = $("#ptype");
-
-// Save/List
-const saveBtn = $("#save");
-const saveMsg = $("#saveMsg");
-const search = $("#search");
-const list = $("#list");
-const clearAll = $("#clearAll");
-
-// Tabs & templates
-const tabBtns = $$(".tab-btn");
-const tabSections = $$(".tab-section");
-
-// Template ids
-const newEmailTitle = $("#newEmailTitle");
-const newEmailContent = $("#newEmailContent");
-const saveEmail = $("#saveEmail");
-const searchEmail = $("#searchEmail");
-const clearAllEmails = $("#clearAllEmails");
-const emailList = $("#emailList");
-
-const newSMSTitle = $("#newSMSTitle");
-const newSMSContent = $("#newSMSContent");
-const saveSMS = $("#saveSMS");
-const searchSMS = $("#searchSMS");
-const clearAllSMS = $("#clearAllSMS");
-const smsList = $("#smsList");
-
-const newObjTitle = $("#newObjTitle");
-const newObjContent = $("#newObjContent");
-const saveObj = $("#saveObj");
-const searchObj = $("#searchObj");
-const objList = $("#objList");
+// --- Elements (declared here, assigned on DOMContentLoaded) ---
+let email, password, signupBtn, signinBtn, signoutBtn, who, authMsg;
+let customer, price, days, calcBtn, clearBtn, result;
+let renoTypeWrap, renoOptions, ptype;
+let saveBtn, saveMsg, search, list, clearAll;
+let tabBtns, tabSections;
+let newEmailTitle, newEmailContent, saveEmail, searchEmail, clearAllEmails, emailList;
+let newSMSTitle, newSMSContent, saveSMS, searchSMS, clearAllSMS, smsList;
+let newObjTitle, newObjContent, saveObj, searchObj, objList;
 
 // --- State ---
 let currentOffers = null;
@@ -100,8 +62,9 @@ const Storage = {
 
 // --- Auth helpers ---
 async function getUser() {
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  const { data, error } = await supabase.auth.getUser();
+  if (error) console.warn("getUser error:", error);
+  return data?.user || null;
 }
 async function updateWho() {
   const u = await getUser();
@@ -109,56 +72,15 @@ async function updateWho() {
   setMsg(authMsg, "", "");
 }
 
-// --- Auth actions ---
-if (signupBtn) signupBtn.addEventListener("click", async () => {
-  if(!email.value || !password.value) return setMsg(authMsg, "Enter email & password", "error");
-  try {
-    const { error } = await supabase.auth.signUp({ email: email.value, password: password.value });
-    if (error) throw error;
-    setMsg(authMsg, "Account created. You can sign in now.", "ok");
-    toast("Account created");
-  } catch (e) {
-    setMsg(authMsg, e.message || "Sign-up failed", "error");
-  }
-});
-if (signinBtn) signinBtn.addEventListener("click", async () => {
-  if(!email.value || !password.value) return setMsg(authMsg, "Enter email & password", "error");
-  try {
-    const { error } = await supabase.auth.signInWithPassword({ email: email.value, password: password.value });
-    if (error) throw error;
-    const { data: { session } } = await supabase.auth.getSession();
-    if(!session) throw new Error("Signed in, but no session was returned");
-    await updateWho();
-    toast("Signed in");
-    await syncFromCloud();
-  } catch (e) {
-    const m = (e?.message || "").toLowerCase();
-    if (m.includes("invalid") || m.includes("email or password")) {
-      setMsg(authMsg, "Wrong email or password", "error");
-    } else {
-      setMsg(authMsg, e.message || "Sign-in failed", "error");
-    }
-  }
-});
-if (signoutBtn) signoutBtn.addEventListener("click", async () => {
-  try {
-    await supabase.auth.signOut();
-    toast("Signed out");
-    setTimeout(()=>location.reload(), 150);
-  } catch (e) {
-    setMsg(authMsg, e?.message || "Sign-out failed", "error");
-  }
-});
-supabase.auth.onAuthStateChange(async () => {
-  await updateWho();
-  await syncFromCloud();
-});
-updateWho();
-
-// --- Calculator ---
-fmtMoneyInput(price);
+// --- Calculator utils ---
 const spread = (p) => p<=149999?5000 : p<=249999?10000 : p<=349999?15000 : p<=449999?20000 : 25000;
 const round1k = (n) => Math.round(n/1000)*1000;
+
+function safeNumber(el) {
+  if (!el) return NaN;
+  const raw = (el.value || "").replace(/,/g,"");
+  return parseFloat(raw);
+}
 
 function populateRenoOptions() {
   const t = ptype?.value;
@@ -176,54 +98,27 @@ function populateRenoOptions() {
   });
 }
 
-$$("input[name='reno']").forEach(r => r.addEventListener("change", (e)=>{
-  const include = e.target.value === "yes";
-  if (renoTypeWrap) renoTypeWrap.style.display = include ? "block" : "none";
-  if (renoOptions) renoOptions.style.display = "none";
-  if(!include && ptype && renoOptions){
-    ptype.value = "";
-    renoOptions.innerHTML = "";
-  }
-  calculate();
-}));
-
-if (ptype) ptype.addEventListener("change", ()=>{
-  if(ptype.value){
-    populateRenoOptions();
-    if (renoOptions) renoOptions.style.display = "grid";
-  }else{
-    if (renoOptions){
-      renoOptions.style.display = "none";
-      renoOptions.innerHTML = "";
-    }
-  }
-  calculate();
-});
-
 function calculate() {
-  const raw = (price?.value || "").replace(/,/g,"");
-  const listed = parseFloat(raw);
+  // If calc UI isn’t on this page/section, just no-op (prevents crashes that break auth)
+  if (!result || !days || !price) return;
+
+  const listed = safeNumber(price);
   if (isNaN(listed)) {
-    if (result) result.textContent = "Enter a valid listed price.";
+    result.textContent = "Enter a valid listed price.";
     currentOffers = null;
     return;
   }
 
-  const d = parseInt(days.value, 10);
+  const d = parseInt(days.value, 10) || 7;
   let baseBottom, baseTop;
 
-  // Expectations (180): Top = listed; Bottom = listed - required spread
-  if (d === 180) {
-    baseTop = listed;
-    baseBottom = listed - spread(listed);
-  }
+  if (d === 180) { baseTop = listed; baseBottom = listed - spread(listed); }
   else if (d === 90) { baseBottom = listed*0.90; baseTop = baseBottom + spread(listed); }
   else if (d === 30) { baseBottom = listed*0.80; baseTop = baseBottom + spread(listed); }
-  else {               baseBottom = listed*0.70; baseTop = baseBottom + spread(listed); }
+  else { baseBottom = listed*0.70; baseTop = baseBottom + spread(listed); }
 
-  let bottom = round1k(baseBottom), top = round1k(baseTop);
-  bottom = Math.max(0, bottom);
-  top = Math.max(0, top);
+  let bottom = Math.max(0, round1k(baseBottom));
+  let top    = Math.max(0, round1k(baseTop));
 
   const include = document.querySelector("input[name='reno']:checked")?.value === "yes";
   let selected = [], total = 0;
@@ -233,48 +128,24 @@ function calculate() {
   }
 
   const adjBottom = Math.max(0, round1k(bottom - total));
-  const adjTop = Math.max(0, round1k(top - total));
+  const adjTop    = Math.max(0, round1k(top - total));
 
   currentOffers = { bottom, top, adjBottom, adjTop, renovations: selected };
   const adjGood = adjBottom >= bottom;
 
-  if (result) {
-    result.innerHTML = `
-      <div class="pill base">Original: £${bottom.toLocaleString()} – £${top.toLocaleString()}</div>
-      ${ total>0 ? `<div style="margin-top:6px">Renovation Costs: £${total.toLocaleString()}</div>` : "" }
-      <div class="pill adj ${adjGood?'good':'bad'}" style="display:block; margin-top:8px">
-        Adjusted: £${adjBottom.toLocaleString()} – £${adjTop.toLocaleString()}
-      </div>
-    `;
-  }
+  result.innerHTML = `
+    <div class="pill base">Original: £${bottom.toLocaleString()} – £${top.toLocaleString()}</div>
+    ${ total>0 ? `<div style="margin-top:6px">Renovation Costs: £${total.toLocaleString()}</div>` : "" }
+    <div class="pill adj ${adjGood?'good':'bad'}" style="display:block; margin-top:8px">
+      Adjusted: £${adjBottom.toLocaleString()} – £${adjTop.toLocaleString()}
+    </div>
+  `;
 }
-
-if (calcBtn) calcBtn.addEventListener("click", calculate);
-if (price) price.addEventListener("input", () => { calculate(); });
-if (days) days.addEventListener("change", calculate);
-setTimeout(calculate, 0);
-
-if (clearBtn) clearBtn.addEventListener("click", ()=>{
-  if(!confirm("Clear current inputs?")) return;
-  if (customer) customer.value = "";
-  if (price) price.value = "";
-  if (days) days.value = "7";
-  const noReno = document.querySelector("input[name='reno'][value='no']");
-  if (noReno) noReno.checked = true;
-  if (renoTypeWrap) renoTypeWrap.style.display = "none";
-  if (ptype) ptype.value = "";
-  if (renoOptions){
-    renoOptions.style.display = "none";
-    renoOptions.innerHTML = "";
-  }
-  if (result) result.textContent = "";
-  currentOffers = null;
-});
 
 // --- Cloud/local save + list ---
 function renderList() {
-  const q = (search?.value || "").toLowerCase();
   if (!list) return;
+  const q = (search?.value || "").toLowerCase();
   list.innerHTML = "";
   saved.forEach((row, i) => {
     if (!row.name || !row.name.toLowerCase().includes(q)) return;
@@ -301,7 +172,8 @@ function renderList() {
       const r = saved[i];
       try{
         if (r.id) {
-          await supabase.from("calculations").delete().eq("id", r.id);
+          const { error } = await supabase.from("calculations").delete().eq("id", r.id);
+          if (error) throw error;
           await syncFromCloud();
           toast("Deleted from cloud");
         } else {
@@ -321,7 +193,8 @@ function renderList() {
 
 async function syncFromCloud() {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: uerr } = await supabase.auth.getUser();
+    if (uerr) console.warn("auth.getUser error:", uerr);
     if (user) {
       const { data, error } = await supabase
         .from("calculations")
@@ -339,61 +212,6 @@ async function syncFromCloud() {
     saved = Storage.get("hsdSaved") || [];
     renderList();
   }
-}
-
-if (saveBtn) saveBtn.addEventListener("click", async ()=>{
-  if(!customer?.value?.trim()) { toast("Enter customer name first"); return; }
-  if(!currentOffers) { toast("Calculate offer first"); return; }
-  const include = document.querySelector("input[name='reno']:checked")?.value === "yes";
-  const row = {
-    name: customer.value.trim(),
-    listedPrice: price.value,
-    timeframe: days.value,
-    includeRenov: include,
-    propertyType: include ? (ptype?.value || "") : "",
-    renovations: currentOffers.renovations || [],
-    originalOffer: { bottom: currentOffers.bottom, top: currentOffers.top },
-    adjustedOffer: { bottom: currentOffers.adjBottom, top: currentOffers.adjTop },
-    timestamp: new Date().toISOString()
-  };
-  try{
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not signed in");
-    const { error } = await supabase.from("calculations").insert({ user_id: user.id, data: row });
-    if (error) throw error;
-    setMsg(saveMsg, "Saved to cloud", "ok");
-    toast("Saved to cloud");
-    await syncFromCloud();
-  } catch (e) {
-    setMsg(saveMsg, "Cloud save failed — saved locally", "error");
-    const local = Storage.get("hsdSaved") || [];
-    local.unshift(row);
-    Storage.set("hsdSaved", local);
-    saved = local;
-    renderList();
-    console.error(e);
-  }
-});
-
-if (search) search.addEventListener("input", renderList);
-if (clearAll) clearAll.addEventListener("click", ()=>{
-  if(!saved.length) return toast("Nothing to clear");
-  if(!confirm("Clear ALL saved calculations (local only)?")) return;
-  saved = [];
-  Storage.set("hsdSaved", saved);
-  renderList();
-  toast("All local calculations cleared");
-});
-
-// --- Tabs ---
-if (tabBtns && tabSections) {
-  tabBtns.forEach(btn=>btn.addEventListener('click', ()=>{
-    tabBtns.forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    tabSections.forEach(sec=>sec.style.display='none');
-    const target = document.getElementById(btn.dataset.tab);
-    if (target) target.style.display='block';
-  }));
 }
 
 // --- Templates (local only) ---
@@ -430,18 +248,213 @@ function setupList(storageKey, titleEl, contentEl, listEl, saveEl, searchEl, cle
   render();
 }
 
-setupList('emails', newEmailTitle, newEmailContent, emailList, saveEmail, searchEmail, clearAllEmails);
-setupList('smsTemplates', newSMSTitle, newSMSContent, smsList, saveSMS, searchSMS, clearAllSMS);
-setupList('objections', newObjTitle, newObjContent, objList, saveObj, searchObj, { addEventListener:()=>{}, value:'' , } /* dummy clear? */);
-
-// Better clear for objections:
-if (searchObj) searchObj.addEventListener('input', ()=>{
-  // re-render via setupList would have handled; quick hack:
-  // trigger by recreating setup (simple & safe here)
-});
-
-// --- Boot ---
+// --- Boot (after DOM ready) ---
 document.addEventListener("DOMContentLoaded", async ()=>{
-  await syncFromCloud();
+  // Bind elements safely now that DOM exists
+  toastEl = $("#toast");
+
+  email = $("#email"); password = $("#password");
+  signupBtn = $("#signup"); signinBtn = $("#signin"); signoutBtn = $("#signout");
+  who = $("#who"); authMsg = $("#authMsg");
+
+  customer = $("#customer"); price = $("#price"); days = $("#days");
+  calcBtn = $("#calc"); clearBtn = $("#clear"); result = $("#result");
+
+  renoTypeWrap = $("#renoTypeWrap"); renoOptions = $("#renoOptions"); ptype = $("#ptype");
+
+  saveBtn = $("#save"); saveMsg = $("#saveMsg"); search = $("#search"); list = $("#list"); clearAll = $("#clearAll");
+
+  tabBtns = $$(".tab-btn"); tabSections = $$(".tab-section");
+
+  newEmailTitle = $("#newEmailTitle"); newEmailContent = $("#newEmailContent");
+  saveEmail = $("#saveEmail"); searchEmail = $("#searchEmail"); clearAllEmails = $("#clearAllEmails"); emailList = $("#emailList");
+
+  newSMSTitle = $("#newSMSTitle"); newSMSContent = $("#newSMSContent");
+  saveSMS = $("#saveSMS"); searchSMS = $("#searchSMS"); clearAllSMS = $("#clearAllSMS"); smsList = $("#smsList");
+
+  newObjTitle = $("#newObjTitle"); newObjContent = $("#newObjContent");
+  saveObj = $("#saveObj"); searchObj = $("#searchObj"); objList = $("#objList");
+
+  // Supabase client
+  requireSupabase();
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+  });
+
+  // Auth actions
+  if (signupBtn) signupBtn.addEventListener("click", async () => {
+    if(!email?.value || !password?.value) return setMsg(authMsg, "Enter email & password", "error");
+    try {
+      const { error } = await supabase.auth.signUp({ email: email.value, password: password.value });
+      if (error) throw error;
+      setMsg(authMsg, "Account created. You can sign in now.", "ok");
+      toast("Account created");
+    } catch (e) {
+      console.error("signUp error:", e);
+      const msg = e?.message || "Sign-up failed";
+      setMsg(authMsg, msg, "error");
+    }
+  });
+
+  if (signinBtn) signinBtn.addEventListener("click", async () => {
+    if(!email?.value || !password?.value) return setMsg(authMsg, "Enter email & password", "error");
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.value, password: password.value });
+      if (error) throw error;
+      if (!data?.session) throw new Error("Signed in, but no session was returned");
+      await updateWho();
+      toast("Signed in");
+      await syncFromCloud();
+      setMsg(authMsg, "", "");
+    } catch (e) {
+      console.error("signIn error:", e);
+      const m = (e?.message || "").toLowerCase();
+      if (m.includes("invalid") || m.includes("email or password")) {
+        setMsg(authMsg, "Wrong email or password", "error");
+      } else if (m.includes("email not confirmed")) {
+        setMsg(authMsg, "Email not confirmed. Check Supabase auth settings or your inbox.", "error");
+      } else {
+        setMsg(authMsg, e?.message || "Sign-in failed", "error");
+      }
+    }
+  });
+
+  if (signoutBtn) signoutBtn.addEventListener("click", async () => {
+    try {
+      await supabase.auth.signOut();
+      toast("Signed out");
+      saved = Storage.get("hsdSaved") || [];
+      renderList();
+      await updateWho();
+    } catch (e) {
+      console.error("signOut error:", e);
+      setMsg(authMsg, e?.message || "Sign-out failed", "error");
+    }
+  });
+
+  supabase.auth.onAuthStateChange(async (event) => {
+    // Keep it light to avoid double-running heavy boot on initial load
+    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "SIGNED_OUT") {
+      await updateWho();
+    }
+  });
+
+  // Calc wiring
+  fmtMoneyInput(price);
+  if (calcBtn) calcBtn.addEventListener("click", calculate);
+  if (price) price.addEventListener("input", calculate);
+  if (days)  days.addEventListener("change", calculate);
+
+  $$("input[name='reno']").forEach(r => r.addEventListener("change", (e)=>{
+    const include = e.target.value === "yes";
+    if (renoTypeWrap) renoTypeWrap.style.display = include ? "block" : "none";
+    if (renoOptions) renoOptions.style.display = "none";
+    if(!include && ptype && renoOptions){
+      ptype.value = "";
+      renoOptions.innerHTML = "";
+    }
+    calculate();
+  }));
+
+  if (ptype) ptype.addEventListener("change", ()=>{
+    if(ptype.value){
+      populateRenoOptions();
+      if (renoOptions) renoOptions.style.display = "grid";
+    }else{
+      if (renoOptions){
+        renoOptions.style.display = "none";
+        renoOptions.innerHTML = "";
+      }
+    }
+    calculate();
+  });
+
+  if (clearBtn) clearBtn.addEventListener("click", ()=>{
+    if(!confirm("Clear current inputs?")) return;
+    if (customer) customer.value = "";
+    if (price) price.value = "";
+    if (days)  days.value = "7";
+    const noReno = document.querySelector("input[name='reno'][value='no']");
+    if (noReno) noReno.checked = true;
+    if (renoTypeWrap) renoTypeWrap.style.display = "none";
+    if (ptype) ptype.value = "";
+    if (renoOptions){
+      renoOptions.style.display = "none";
+      renoOptions.innerHTML = "";
+    }
+    if (result) result.textContent = "";
+    currentOffers = null;
+  });
+
+  // Save & list
+  async function ensureSignedInOrLocal() {
+    const u = await getUser();
+    return !!u;
+  }
+
+  if (saveBtn) saveBtn.addEventListener("click", async ()=>{
+    if(!customer?.value?.trim()) { toast("Enter customer name first"); return; }
+    if(!currentOffers) { toast("Calculate offer first"); return; }
+    const include = document.querySelector("input[name='reno']:checked")?.value === "yes";
+    const row = {
+      name: customer.value.trim(),
+      listedPrice: price?.value || "",
+      timeframe: days?.value || "",
+      includeRenov: include,
+      propertyType: include ? (ptype?.value || "") : "",
+      renovations: currentOffers.renovations || [],
+      originalOffer: { bottom: currentOffers.bottom, top: currentOffers.top },
+      adjustedOffer: { bottom: currentOffers.adjBottom, top: currentOffers.adjTop },
+      timestamp: new Date().toISOString()
+    };
+    try{
+      if (!(await ensureSignedInOrLocal())) throw new Error("Not signed in");
+      const { error } = await supabase.from("calculations").insert({ data: row });
+      if (error) throw error;
+      setMsg(saveMsg, "Saved to cloud", "ok");
+      toast("Saved to cloud");
+      await syncFromCloud();
+    } catch (e) {
+      console.warn("Cloud save failed, falling back to local:", e);
+      setMsg(saveMsg, "Cloud save failed — saved locally", "error");
+      const local = Storage.get("hsdSaved") || [];
+      local.unshift(row);
+      Storage.set("hsdSaved", local);
+      saved = local;
+      renderList();
+    }
+  });
+
+  if (search) search.addEventListener("input", renderList);
+  if (clearAll) clearAll.addEventListener("click", ()=>{
+    if(!saved.length) return toast("Nothing to clear");
+    if(!confirm("Clear ALL saved calculations (local only)?")) return;
+    saved = [];
+    Storage.set("hsdSaved", saved);
+    renderList();
+    toast("All local calculations cleared");
+  });
+
+  // Tabs
+  if (tabBtns && tabSections) {
+    tabBtns.forEach(btn=>btn.addEventListener('click', ()=>{
+      tabBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      tabSections.forEach(sec=>sec.style.display='none');
+      const target = document.getElementById(btn.dataset.tab);
+      if (target) target.style.display='block';
+    }));
+  }
+
+  // Templates
+  setupList('emails', newEmailTitle, newEmailContent, emailList, saveEmail, searchEmail, clearAllEmails);
+  setupList('smsTemplates', newSMSTitle, newSMSContent, smsList, saveSMS, searchSMS, clearAllSMS);
+  setupList('objections', newObjTitle, newObjContent, objList, saveObj, searchObj, { addEventListener:()=>{}, value:'' });
+
+  // Initial sync + first render (safe)
+  try { await syncFromCloud(); } catch {}
   calculate();
 });
+
+// Also run a very early, safe calculate for pages that render calc first
+setTimeout(()=>{ try { calculate(); } catch(e){ /* ignore */ } }, 0);
