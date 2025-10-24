@@ -21,7 +21,6 @@ function requireSupabase() {
     throw new Error("Supabase SDK missing");
   }
 }
-
 const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
 let supabase;
@@ -60,11 +59,14 @@ const Storage = {
   set: (k, v) => localStorage.setItem(k, JSON.stringify(v))
 };
 
-// --- Auth helpers ---
+// --- Auth helpers (use getSession → stable) ---
 async function getUser() {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) console.warn("getUser error:", error);
-  return data?.user || null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    console.warn("getSession error:", error);
+    return null;
+  }
+  return data?.session?.user || null;
 }
 async function updateWho() {
   const u = await getUser();
@@ -75,13 +77,11 @@ async function updateWho() {
 // --- Calculator utils ---
 const spread = (p) => p<=149999?5000 : p<=249999?10000 : p<=349999?15000 : p<=449999?20000 : 25000;
 const round1k = (n) => Math.round(n/1000)*1000;
-
 function safeNumber(el) {
   if (!el) return NaN;
   const raw = (el.value || "").replace(/,/g,"");
   return parseFloat(raw);
 }
-
 function populateRenoOptions() {
   const t = ptype?.value;
   if (!renoOptions) return;
@@ -97,26 +97,20 @@ function populateRenoOptions() {
     renoOptions.appendChild(row);
   });
 }
-
 function calculate() {
-  // If calc UI isn’t on this page/section, just no-op (prevents crashes that break auth)
-  if (!result || !days || !price) return;
-
+  if (!result || !days || !price) return; // page without calc UI
   const listed = safeNumber(price);
   if (isNaN(listed)) {
     result.textContent = "Enter a valid listed price.";
     currentOffers = null;
     return;
   }
-
   const d = parseInt(days.value, 10) || 7;
   let baseBottom, baseTop;
-
   if (d === 180) { baseTop = listed; baseBottom = listed - spread(listed); }
   else if (d === 90) { baseBottom = listed*0.90; baseTop = baseBottom + spread(listed); }
   else if (d === 30) { baseBottom = listed*0.80; baseTop = baseBottom + spread(listed); }
   else { baseBottom = listed*0.70; baseTop = baseBottom + spread(listed); }
-
   let bottom = Math.max(0, round1k(baseBottom));
   let top    = Math.max(0, round1k(baseTop));
 
@@ -126,7 +120,6 @@ function calculate() {
     selected = [...renoOptions.querySelectorAll("input:checked")].map(cb => cb.value);
     selected.forEach(i => { total += renoCosts[ptype.value][i] || 0; });
   }
-
   const adjBottom = Math.max(0, round1k(bottom - total));
   const adjTop    = Math.max(0, round1k(top - total));
 
@@ -142,7 +135,7 @@ function calculate() {
   `;
 }
 
-// --- Cloud/local save + list ---
+// --- Cloud/local list render ---
 function renderList() {
   if (!list) return;
   const q = (search?.value || "").toLowerCase();
@@ -193,15 +186,18 @@ function renderList() {
 
 async function syncFromCloud() {
   try {
-    const { data: { user }, error: uerr } = await supabase.auth.getUser();
-    if (uerr) console.warn("auth.getUser error:", uerr);
-    if (user) {
-      const { data, error } = await supabase
+    const u = await getUser();
+    if (u) {
+      const res = await supabase
         .from("calculations")
         .select("id, data, created_at")
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      saved = (data || []).map(r => ({ ...r.data, id: r.id, timestamp: r.data?.timestamp || r.created_at }));
+      if (res.error) {
+        console.error("select calculations error:", res.error);
+        throw res.error;
+      }
+      const data = res.data || [];
+      saved = data.map(r => ({ ...r.data, id: r.id, timestamp: r.data?.timestamp || r.created_at }));
     } else {
       saved = Storage.get("hsdSaved") || [];
     }
@@ -250,28 +246,20 @@ function setupList(storageKey, titleEl, contentEl, listEl, saveEl, searchEl, cle
 
 // --- Boot (after DOM ready) ---
 document.addEventListener("DOMContentLoaded", async ()=>{
-  // Bind elements safely now that DOM exists
+  // Bind elements
   toastEl = $("#toast");
-
   email = $("#email"); password = $("#password");
   signupBtn = $("#signup"); signinBtn = $("#signin"); signoutBtn = $("#signout");
   who = $("#who"); authMsg = $("#authMsg");
-
   customer = $("#customer"); price = $("#price"); days = $("#days");
   calcBtn = $("#calc"); clearBtn = $("#clear"); result = $("#result");
-
   renoTypeWrap = $("#renoTypeWrap"); renoOptions = $("#renoOptions"); ptype = $("#ptype");
-
   saveBtn = $("#save"); saveMsg = $("#saveMsg"); search = $("#search"); list = $("#list"); clearAll = $("#clearAll");
-
   tabBtns = $$(".tab-btn"); tabSections = $$(".tab-section");
-
   newEmailTitle = $("#newEmailTitle"); newEmailContent = $("#newEmailContent");
   saveEmail = $("#saveEmail"); searchEmail = $("#searchEmail"); clearAllEmails = $("#clearAllEmails"); emailList = $("#emailList");
-
   newSMSTitle = $("#newSMSTitle"); newSMSContent = $("#newSMSContent");
   saveSMS = $("#saveSMS"); searchSMS = $("#searchSMS"); clearAllSMS = $("#clearAllSMS"); smsList = $("#smsList");
-
   newObjTitle = $("#newObjTitle"); newObjContent = $("#newObjContent");
   saveObj = $("#saveObj"); searchObj = $("#searchObj"); objList = $("#objList");
 
@@ -291,8 +279,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       toast("Account created");
     } catch (e) {
       console.error("signUp error:", e);
-      const msg = e?.message || "Sign-up failed";
-      setMsg(authMsg, msg, "error");
+      setMsg(authMsg, e?.message || "Sign-up failed", "error");
     }
   });
 
@@ -301,20 +288,22 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.value, password: password.value });
       if (error) throw error;
-      if (!data?.session) throw new Error("Signed in, but no session was returned");
+      const u = await getUser(); // stable
+      if (!u) throw new Error("Signed in, but no active session (check Auth settings)");
+
       await updateWho();
       toast("Signed in");
+      setMsg(authMsg, "Signed in", "ok");
       await syncFromCloud();
-      setMsg(authMsg, "", "");
     } catch (e) {
       console.error("signIn error:", e);
-      const m = (e?.message || "").toLowerCase();
-      if (m.includes("invalid") || m.includes("email or password")) {
+      const m = String(e?.message || "").toLowerCase();
+      if (m.includes("email") && m.includes("not") && m.includes("confirmed")) {
+        setMsg(authMsg, "Email not confirmed. Confirm it or disable confirmations in Supabase Auth.", "error");
+      } else if (m.includes("invalid") || m.includes("email or password")) {
         setMsg(authMsg, "Wrong email or password", "error");
-      } else if (m.includes("email not confirmed")) {
-        setMsg(authMsg, "Email not confirmed. Check Supabase auth settings or your inbox.", "error");
       } else {
-        setMsg(authMsg, e?.message || "Sign-in failed", "error");
+        setMsg(authMsg, `Sign-in failed: ${e?.message || "unknown error"}`, "error");
       }
     }
   });
@@ -333,9 +322,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   });
 
   supabase.auth.onAuthStateChange(async (event) => {
-    // Keep it light to avoid double-running heavy boot on initial load
-    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "SIGNED_OUT") {
-      await updateWho();
+    await updateWho();
+    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+      await syncFromCloud();
     }
   });
 
@@ -386,15 +375,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     currentOffers = null;
   });
 
-  // Save & list
-  async function ensureSignedInOrLocal() {
-    const u = await getUser();
-    return !!u;
-  }
-
+  // Save calc (with user_id to satisfy RLS)
   if (saveBtn) saveBtn.addEventListener("click", async ()=>{
     if(!customer?.value?.trim()) { toast("Enter customer name first"); return; }
     if(!currentOffers) { toast("Calculate offer first"); return; }
+
     const include = document.querySelector("input[name='reno']:checked")?.value === "yes";
     const row = {
       name: customer.value.trim(),
@@ -407,20 +392,24 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       adjustedOffer: { bottom: currentOffers.adjBottom, top: currentOffers.adjTop },
       timestamp: new Date().toISOString()
     };
-    try{
-      if (!(await ensureSignedInOrLocal())) throw new Error("Not signed in");
-        const u = await getUser();
-        const { error } = await supabase.from("calculations")
-          .insert({ user_id: u.id, data: row });
-        if (error) console.error(error);
 
-      if (error) throw error;
+    try {
+      const u = await getUser();
+      if (!u) throw new Error("Not signed in");
+
+      const { data: inserted, error: insErr } = await supabase
+        .from("calculations")
+        .insert({ user_id: u.id, data: row })
+        .select("id, created_at")
+        .single();
+
+      if (insErr) throw insErr;
       setMsg(saveMsg, "Saved to cloud", "ok");
       toast("Saved to cloud");
       await syncFromCloud();
     } catch (e) {
-      console.warn("Cloud save failed, falling back to local:", e);
-      setMsg(saveMsg, "Cloud save failed — saved locally", "error");
+      console.warn("Cloud save failed, saving locally:", e);
+      setMsg(saveMsg, `Cloud save failed — saved locally (${e?.message || "unknown error"})`, "error");
       const local = Storage.get("hsdSaved") || [];
       local.unshift(row);
       Storage.set("hsdSaved", local);
@@ -455,10 +444,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   setupList('smsTemplates', newSMSTitle, newSMSContent, smsList, saveSMS, searchSMS, clearAllSMS);
   setupList('objections', newObjTitle, newObjContent, objList, saveObj, searchObj, { addEventListener:()=>{}, value:'' });
 
-  // Initial sync + first render (safe)
+  // Initial sync + first render
   try { await syncFromCloud(); } catch {}
   calculate();
 });
 
-// Also run a very early, safe calculate for pages that render calc first
+// Early safe calculate
 setTimeout(()=>{ try { calculate(); } catch(e){ /* ignore */ } }, 0);
