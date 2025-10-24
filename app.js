@@ -68,6 +68,20 @@ async function updateWho(){
   setMsg(authMsg,"","");
 }
 
+// ✅ Paint the auth state into UI (label + debug) no matter what
+async function paintAuth(){
+  try{
+    const { data } = await supabase.auth.getSession();
+    const u = data?.session?.user || null;
+    const whoEl = document.getElementById("who");
+    const dbgEl = document.getElementById("authDebug");
+    if (whoEl) whoEl.textContent = u ? `Signed in as ${u.email}` : "Not signed in";
+    if (dbgEl) dbgEl.textContent = u ? `session: ${u.email}` : "session: null";
+  }catch(e){
+    console.warn("paintAuth error:", e);
+  }
+}
+
 // --- Calculator utils ---
 const spread = (p)=>p<=149999?5000:p<=249999?10000:p<=349999?15000:p<=449999?20000:25000;
 const round1k=(n)=>Math.round(n/1000)*1000;
@@ -231,6 +245,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false }
   });
 
+  // 🔁 Heartbeat to keep "Signed in as..." always accurate
+  await paintAuth();
+  setInterval(paintAuth, 2000);
+
   // --- Auth actions ---
   if(signupBtn) signupBtn.addEventListener("click", async ()=>{
     if(!email?.value || !password?.value) return setMsg(authMsg,"Enter email & password","error");
@@ -252,6 +270,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       setMsg(authMsg,"Signed in","ok"); toast("Signed in");
 
       await updateWho();
+      await paintAuth();           // ✅ repaint after sign-in
       await syncFromCloud();
     }catch(e){
       console.error("signIn error:",e);
@@ -268,11 +287,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       toast("Signed out");
       saved=Storage.get("hsdSaved")||[]; renderList();
       await updateWho();
+      await paintAuth();           // ✅ repaint after sign-out
     }catch(e){ console.error("signOut error:",e); setMsg(authMsg,e?.message||"Sign-out failed","error"); }
   });
 
   supabase.auth.onAuthStateChange(async (event)=>{
     await updateWho();
+    await paintAuth();             // ✅ repaint on any auth event
     if(event==="SIGNED_IN" || event==="TOKEN_REFRESHED"){
       setMsg(authMsg,"Signed in","ok");
       await syncFromCloud();
@@ -331,7 +352,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
     try{
       const u=await getUser();
-      if(!u) throw new Error("Not signed in");
+      if(!u){ setMsg(saveMsg,"Not signed in","error"); return; }
 
       const { data: inserted, error: insErr } = await supabase
         .from("calculations")
