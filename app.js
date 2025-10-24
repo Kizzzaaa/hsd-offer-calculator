@@ -24,7 +24,7 @@ function requireSupabase(){
 const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
 let supabase;
-let realtimeSub = null;   // <-- realtime channel handle
+let realtimeSub = null;
 
 // --- Elements (assigned on DOMContentLoaded) ---
 let email,password,signupBtn,signinBtn,signoutBtn,who,authMsg;
@@ -59,8 +59,7 @@ const Storage={
 
 // --- Auth helpers (use session for reliability) ---
 async function getUser(){
-  const { data, error } = await supabase.auth.getSession();
-  if(error) return null;
+  const { data } = await supabase.auth.getSession();
   return data?.session?.user || null;
 }
 async function updateWho(){
@@ -128,6 +127,17 @@ function calculate(){
     </div>`;
 }
 
+// --- Merge helper so server results don't wipe optimistic items ---
+function mergeServerRowsIntoSaved(serverRows){
+  const byId = new Map(saved.map(r => [r.id || `local-${r.timestamp}`, r]));
+  serverRows.forEach(r => {
+    const key = r.id || `local-${r.timestamp}`;
+    byId.set(key, r);
+  });
+  saved = Array.from(byId.values())
+    .sort((a,b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
+}
+
 // --- Cloud/local list render ---
 function renderList(){
   if(!list) return;
@@ -154,17 +164,27 @@ function renderList(){
       ev.stopPropagation();
       if(!confirm("Delete this saved calculation?")) return;
       const r=saved[i];
+
+      // Optimistic remove
+      const backup = saved.slice();
+      saved.splice(i,1);
+      renderList();
+
       try{
-        // Optimistic remove
         if (r.id) {
-          saved.splice(i,1); renderList();
           const { error } = await supabase.from("calculations").delete().eq("id", r.id);
           if(error) throw error;
           toast("Deleted from cloud");
         } else {
-          saved.splice(i,1); Storage.set("hsdSaved",saved); renderList(); toast("Deleted locally");
+          Storage.set("hsdSaved",saved);
+          toast("Deleted locally");
         }
-      }catch(e){ toast("Delete failed"); console.error(e); }
+      }catch(e){
+        console.error("Delete failed:", e);
+        toast("Delete failed");
+        saved = backup; // rollback UI
+        renderList();
+      }
     });
     list.appendChild(wrap);
   });
@@ -176,16 +196,17 @@ async function syncFromCloud(){
     if(u){
       const res=await supabase.from("calculations").select("id, data, created_at").order("created_at",{ascending:false});
       if(res.error){ console.error("select calculations error:",res.error); throw res.error; }
-      const data=res.data||[];
-      saved=data.map(r=>({...r.data,id:r.id,timestamp:r.data?.timestamp||r.created_at}));
+      const server = (res.data||[]).map(r => ({ ...r.data, id:r.id, timestamp:r.data?.timestamp || r.created_at }));
+      mergeServerRowsIntoSaved(server); // <— do NOT clobber optimistic
     }else{
       saved=Storage.get("hsdSaved")||[];
     }
     renderList();
   }catch(e){
     console.error("syncFromCloud failed:",e);
-    toast("Cloud sync failed — showing local");
-    saved=Storage.get("hsdSaved")||[];
+    // keep whatever we already have (optimistic/local) and just render
+    toast("Cloud sync failed — showing local/optimistic");
+    if(!saved.length) saved=Storage.get("hsdSaved")||[];
     renderList();
   }
 }
@@ -195,7 +216,6 @@ async function subscribeToRealtime(){
   const u = await getUser();
   if (!u) return;
 
-  // Reset any existing
   if (realtimeSub) { try { supabase.removeChannel(realtimeSub); } catch {} realtimeSub = null; }
 
   realtimeSub = supabase
@@ -317,13 +337,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       const { data, error } = await supabase.auth.signInWithPassword({ email:email.value, password:password.value });
       if(error) throw error;
 
-      // Immediate UI update from response
       if(who && data?.user?.email) who.textContent=`Signed in as ${data.user.email}`;
       setMsg(authMsg,"Signed in","ok"); toast("Signed in");
 
       await updateWho();
-      await paintAuth();           // repaint after sign-in
-      await subscribeToRealtime(); // start realtime
+      await paintAuth();
+      await subscribeToRealtime();
       await syncFromCloud();
     }catch(e){
       console.error("signIn error:",e);
@@ -337,19 +356,19 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   if(signoutBtn) signoutBtn.addEventListener("click", async ()=>{
     try{
       await supabase.auth.signOut();
-      unsubscribeRealtime();       // stop realtime
+      unsubscribeRealtime();
       toast("Signed out");
       saved=Storage.get("hsdSaved")||[]; renderList();
       await updateWho();
-      await paintAuth();           // repaint after sign-out
+      await paintAuth();
     }catch(e){ console.error("signOut error:",e); setMsg(authMsg,e?.message||"Sign-out failed","error"); }
   });
 
   supabase.auth.onAuthStateChange(async (event)=>{
     await updateWho();
-    await paintAuth();             // repaint on any auth event
+    await paintAuth();
     if(event==="SIGNED_IN" || event==="TOKEN_REFRESHED"){
-      await subscribeToRealtime(); // (re)subscribe when token/session changes
+      await subscribeToRealtime();
       setMsg(authMsg,"Signed in","ok");
       await syncFromCloud();
     }
@@ -390,7 +409,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     currentOffers=null;
   });
 
-  // --- Save calc (optimistic + RLS-friendly insert) ---
+  // --- Save calc (optimistic + merge + search-clear) ---
   if(saveBtn) saveBtn.addEventListener("click", async ()=>{
     if(!customer?.value?.trim()) { toast("Enter customer name first"); return; }
     if(!currentOffers) { toast("Calculate offer first"); return; }
@@ -424,18 +443,23 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         throw insErr;
       }
 
-      // ✅ Optimistic add to top of list
+      // ✅ Clear search so the new row is visible even if a filter was active
+      if (search && search.value) { search.value = ""; }
+
+      // ✅ Optimistic add to top
       const savedRow = { ...row, id: inserted.id, timestamp: row.timestamp };
       saved.unshift(savedRow);
       renderList();
 
       setMsg(saveMsg,"Saved to cloud","ok"); toast("Saved to cloud");
 
-      // Optional: ensure order matches server
+      // Merge with server truth but NEVER wipe the optimistic row
       await syncFromCloud();
     }catch(e){
       console.warn("Cloud save failed, saving locally:",e);
       if(!saveMsg.textContent) setMsg(saveMsg,`Saved locally (${e?.message || "unknown error"})`,"error");
+
+      if (search && search.value) { search.value = ""; } // ensure visible
       const local=Storage.get("hsdSaved")||[];
       local.unshift(row); Storage.set("hsdSaved",local); saved=local; renderList();
     }
