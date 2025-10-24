@@ -1,631 +1,118 @@
-Skip to content
-Navigation Menu
-Kizzzaaa
-hsd-offer-calculator
-
-Type / to search
-Code
-Issues
-Pull requests
-Actions
-Projects
-Wiki
-Security
-Insights
-Settings
-Commit 4354352
-Kizzzaaa
-Kizzzaaa
-authored
-last week
-·
-·
-Verified
-Add files via upload
-main
-1 parent 
-9dd7ec1
- commit 
-4354352
-File tree
-Filter files…
-app.js
-index.html
-2 files changed
-+491
--464
-lines changed
-Search within code
- 
-‎app.js‎
-+358
-Lines changed: 358 additions & 0 deletions
-Original file line number	Diff line number	Diff line change
-@@ -0,0 +1,358 @@
-// --- Small helpers ---
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => Array.from(document.querySelectorAll(s));
-const toastEl = $("#toast");
-function toast(text) { toastEl.textContent = text; toastEl.style.display = "block"; setTimeout(()=> toastEl.style.display="none", 1800); }
-function setMsg(el, text, kind) { el.textContent = text || ""; el.className = "msg" + (kind ? " " + kind : ""); }
-function fmtMoneyInput(el){
-  el.addEventListener("input", function(){
-    let v = this.value.replace(/,/g,'');
-    if(v && !isNaN(v)) this.value = parseInt(v,10).toLocaleString();
-    else if(v === '') this.value = '';
-  });
-}
-// --- Supabase init (replace if needed) ---
-const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-});
-// --- Elements ---
-const email = $("#email");
-const password = $("#password");
-const signupBtn = $("#signup");
-const signinBtn = $("#signin");
-const signoutBtn = $("#signout");
-const who = $("#who");
-const authMsg = $("#authMsg");
-const customer = $("#customer");
-const price = $("#price");
-const days = $("#days");
-const calcBtn = $("#calc");
-const clearBtn = $("#clear");
-const result = $("#result");
-const renoTypeWrap = $("#renoTypeWrap");
-const renoOptions = $("#renoOptions");
-const ptype = $("#ptype");
-const saveBtn = $("#save");
-const saveMsg = $("#saveMsg");
-const search = $("#search");
-const list = $("#list");
-const clearAll = $("#clearAll");
-// --- State ---
-let currentOffers = null;
-let saved = []; // local mirror of what's shown
-// --- Renovation data ---
-const renoCosts = {
-  "2 bed flat":      { Kitchen:5000, Bathroom:1500, Redecoration:1000, Roof:null, Rewire:1500, Windows:1000, Boiler:1000, Garden:null },
-  "2 bed terrace":   { Kitchen:5000, Bathroom:1500, Redecoration:850,  Roof:2500, Rewire:1500, Windows:1000, Boiler:1000, Garden:500 },
-  "3 bed semi":      { Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 },
-  "4 bed detached":  { Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 },
-  "4 bed townhouse": { Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 },
-  "3 bed end terrace":{Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 },
-  "3 bed bungalow":  { Kitchen:4000, Bathroom:3500, Redecoration:1050, Roof:2500, Rewire:2500, Windows:1000, Boiler:1000, Garden:1500 }
-};
-// --- Local storage ---
-const Storage = {
-  get: (k) => JSON.parse(localStorage.getItem(k) || "[]"),
-  set: (k, v) => localStorage.setItem(k, JSON.stringify(v))
-};
-// --- Auth helpers ---
-async function getUser() {
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
-}
-async function updateWho() {
-  const u = await getUser();
-  who.textContent = u ? `Signed in as ${u.email}` : "Not signed in";
-  setMsg(authMsg, "", "");
-}
-// --- Auth actions ---
-signupBtn.addEventListener("click", async () => {
-  if(!email.value || !password.value) return setMsg(authMsg, "Enter email & password", "error");
-  try {
-    const { error } = await supabase.auth.signUp({ email: email.value, password: password.value });
-    if (error) throw error;
-    setMsg(authMsg, "Account created. You can sign in now.", "ok");
-    toast("Account created");
-  } catch (e) {
-    setMsg(authMsg, e.message || "Sign-up failed", "error");
-  }
-});
-signinBtn.addEventListener("click", async () => {
-  if(!email.value || !password.value) return setMsg(authMsg, "Enter email & password", "error");
-  try {
-    const { error } = await supabase.auth.signInWithPassword({ email: email.value, password: password.value });
-    if (error) throw error;
-    // Verify we actually have a session now:
-    const { data: { session } } = await supabase.auth.getSession();
-    if(!session) throw new Error("Signed in, but no session was returned");
-    await updateWho();
-    toast("Signed in");
-    await syncFromCloud();
-  } catch (e) {
-    const m = (e?.message || "").toLowerCase();
-    if (m.includes("invalid") || m.includes("email or password")) {
-      setMsg(authMsg, "Wrong email or password", "error");
-    } else {
-      setMsg(authMsg, e.message || "Sign-in failed", "error");
-    }
-  }
-});
-signoutBtn.addEventListener("click", async () => {
-  try {
-    await supabase.auth.signOut();
-    toast("Signed out");
-    setTimeout(()=>location.reload(), 150);
-  } catch (e) {
-    setMsg(authMsg, e?.message || "Sign-out failed", "error");
-  }
-});
-// Keep UI in sync with auth changes
-supabase.auth.onAuthStateChange(async () => {
-  await updateWho();
-  await syncFromCloud();
-});
-updateWho();
-// --- Calculator ---
-fmtMoneyInput(price);
-const spread = (p) => p<=149999?5000 : p<=249999?10000 : p<=349999?15000 : p<=449999?20000 : 25000;
-const round1k = (n) => Math.round(n/1000)*1000;
-function populateRenoOptions() {
-  const t = ptype.value;
-  renoOptions.innerHTML = "";
-  if (!t) return;
-  const costs = renoCosts[t];
-  Object.keys(costs).forEach(item=>{
-    const c = costs[item];
-    const disabled = c === null ? "disabled" : "";
-    const label = c === null ? `${item} (N/A)` : `${item} (£${c.toLocaleString()})`;
-    const row = document.createElement("label");
-    row.innerHTML = `<input type="checkbox" value="${item}" ${disabled}> ${label}`;
-    renoOptions.appendChild(row);
-  });
-}
-$$("input[name='reno']").forEach(r => r.addEventListener("change", (e)=>{
-  const include = e.target.value === "yes";
-  renoTypeWrap.style.display = include ? "block" : "none";
-  renoOptions.style.display = "none";
-  if(!include){
-    ptype.value = "";
-    renoOptions.innerHTML = "";
-  }
-  calculate();
-}));
-ptype.addEventListener("change", ()=>{
-  if(ptype.value){
-    populateRenoOptions();
-    renoOptions.style.display = "grid";
-  }else{
-    renoOptions.style.display = "none";
-    renoOptions.innerHTML = "";
-  }
-  calculate();
-});
-function calculate() {
-  const raw = (price.value || "").replace(/,/g,"");
-  const listed = parseFloat(raw);
-  if (isNaN(listed)) {
-    result.textContent = "Enter a valid listed price.";
-    currentOffers = null;
-    return;
-  }
-  const d = parseInt(days.value, 10);
-  let baseBottom, baseTop;
-
-  // ✅ Expectations logic (180): Top = listed; Bottom = listed - required spread
-  if (d === 180) {
-    baseTop = listed;
-    baseBottom = listed - spread(listed);
-  }
-  else if (d === 90) { baseBottom = listed*0.90; baseTop = baseBottom + spread(listed); }
-  else if (d === 30) { baseBottom = listed*0.80; baseTop = baseBottom + spread(listed); }
-  else {               baseBottom = listed*0.70; baseTop = baseBottom + spread(listed); }
-
-  let bottom = round1k(baseBottom), top = round1k(baseTop);
-  if (bottom<0) bottom=0; if (top<0) top=0;
-
-  const include = document.querySelector("input[name='reno']:checked")?.value === "yes";
-  let selected = [], total = 0;
-  if (include && ptype.value) {
-    selected = [...renoOptions.querySelectorAll("input:checked")].map(cb => cb.value);
-    selected.forEach(i => { total += renoCosts[ptype.value][i] || 0; });
-  }
-
-  const adjBottom = Math.max(0, round1k(bottom - total));
-  const adjTop = Math.max(0, round1k(top - total));
-
-  currentOffers = { bottom, top, adjBottom, adjTop, renovations: selected };
-  const adjGood = adjBottom >= bottom;
-
-  result.innerHTML = `
-    <div class="pill base">Original: £${bottom.toLocaleString()} – £${top.toLocaleString()}</div>
-    ${ total>0 ? `<div style="margin-top:6px">Renovation Costs: £${total.toLocaleString()}</div>` : "" }
-    <div class="pill adj ${adjGood?'good':''}" style="display:block; margin-top:8px">
-      Adjusted: £${adjBottom.toLocaleString()} – £${adjTop.toLocaleString()}
-    </div>
-  `;
-}
-
-calcBtn.addEventListener("click", calculate);
-price.addEventListener("input", () => { // live calc (no need to toggle reno)
-  // slight debounce not strictly needed here
-  calculate();
-});
-days.addEventListener("change", calculate);
-// initial calc
-setTimeout(calculate, 0);
-clearBtn.addEventListener("click", ()=>{
-  if(!confirm("Clear current inputs?")) return;
-  customer.value = "";
-  price.value = "";
-  days.value = "7";
-  document.querySelector("input[name='reno'][value='no']").checked = true;
-  renoTypeWrap.style.display = "none";
-  ptype.value = "";
-  renoOptions.style.display = "none";
-  renoOptions.innerHTML = "";
-  result.textContent = "";
-  currentOffers = null;
-});
-// --- Cloud/local save + list ---
-function renderList() {
-  const q = (search.value || "").toLowerCase();
-  list.innerHTML = "";
-  saved.forEach((row, i) => {
-    if (!row.name || !row.name.toLowerCase().includes(q)) return;
-    const wrap = document.createElement("div");
-    wrap.className = "item";
-    const badge = row.id ? "Cloud" : "Local";
-    wrap.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px">
-        <div><strong>${row.name}</strong> ${row.propertyType?(" | "+row.propertyType):""}</div>
-        <small class="badge">${badge}</small>
-      </div>
-      <div style="margin-top:6px; background:#d9e8ff; padding:6px; border-radius:8px">
-        Original: £${row.originalOffer.bottom.toLocaleString()} – £${row.originalOffer.top.toLocaleString()}
-      </div>
-      <div style="margin-top:6px; background:${row.adjustedOffer.bottom >= row.originalOffer.bottom ? 'var(--good)' : 'var(--bad)'}; padding:6px; border-radius:8px">
-        Adjusted: £${row.adjustedOffer.bottom.toLocaleString()} – £${row.adjustedOffer.top.toLocaleString()}
-      </div>
-      <small style="opacity:.8; display:block; margin-top:6px">${new Date(row.timestamp).toLocaleString()}</small>
-      <button class="btn ghost del">Del</button>
-    `;
-    wrap.querySelector(".del").addEventListener("click", async (ev)=>{
-      ev.stopPropagation();
-      if(!confirm("Delete this saved calculation?")) return;
-      const r = saved[i];
-      try{
-        if (r.id) {
-          await supabase.from("calculations").delete().eq("id", r.id);
-          await syncFromCloud();
-          toast("Deleted from cloud");
-        } else {
-          saved.splice(i,1);
-          Storage.set("hsdSaved", saved);
-          renderList();
-          toast("Deleted locally");
-        }
-      }catch(e){
-        toast("Delete failed");
-        console.error(e);
-      }
-    });
-    list.appendChild(wrap);
-  });
-}
-async function syncFromCloud() {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data, error } = await supabase
-        .from("calculations")
-        .select("id, data, created_at")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      saved = (data || []).map(r => ({ ...r.data, id: r.id, timestamp: r.data?.timestamp || r.created_at }));
-    } else {
-      saved = Storage.get("hsdSaved") || [];
-    }
-    renderList();
-  } catch (e) {
-    console.error(e);
-    toast("Cloud sync failed — showing local");
-    saved = Storage.get("hsdSaved") || [];
-    renderList();
-  }
-}
-saveBtn.addEventListener("click", async ()=>{
-  if(!customer.value.trim()) { toast("Enter customer name first"); return; }
-  if(!currentOffers) { toast("Calculate offer first"); return; }
-  const include = document.querySelector("input[name='reno']:checked")?.value === "yes";
-  const row = {
-    name: customer.value.trim(),
-    listedPrice: price.value,
-    timeframe: days.value,
-    includeRenov: include,
-    propertyType: include ? (ptype.value || "") : "",
-    renovations: currentOffers.renovations || [],
-    originalOffer: { bottom: currentOffers.bottom, top: currentOffers.top },
-    adjustedOffer: { bottom: currentOffers.adjBottom, top: currentOffers.adjTop },
-    timestamp: new Date().toISOString()
-  };
-  try{
-    // Try cloud first
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not signed in");
-    const { error } = await supabase.from("calculations").insert({ user_id: user.id, data: row });
-    if (error) throw error;
-    setMsg(saveMsg, "Saved to cloud", "ok");
-    toast("Saved to cloud");
-    await syncFromCloud();
-  } catch (e) {
-    // Fallback to local
-    setMsg(saveMsg, "Cloud save failed — saved locally", "error");
-    const local = Storage.get("hsdSaved") || [];
-    local.unshift(row);
-    Storage.set("hsdSaved", local);
-    saved = local;
-    renderList();
-    console.error(e);
-  }
-});
-search.addEventListener("input", renderList);
-clearAll.addEventListener("click", ()=>{
-  if(!saved.length) return toast("Nothing to clear");
-  if(!confirm("Clear ALL saved calculations (local only)?")) return;
-  saved = [];
-  Storage.set("hsdSaved", saved);
-  renderList();
-  toast("All local calculations cleared");
-});
-// Initial wiring
-document.addEventListener("DOMContentLoaded", async ()=>{
-  await syncFromCloud();
-  calculate();
-});
-‎index.html‎
-+133
--464
-Lines changed: 133 additions & 464 deletions
-Original file line number	Diff line number	Diff line change
-@@ -1,489 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>HSD Offer Calculator — Templates & Saved</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#dcefff; --card:#ffffff; --ink:#222; --muted:#333;
-    --brand:#1a73e8; --brand-700:#155bb5; --soft:#f5f9ff;
-    --good:#e6ffed; --bad:#ffe6e6; --ring: rgba(26,115,232,0.35);
-    --border:#cbd5e1; --chip:#e6f0fa;
-  }
-  [data-theme="dark"]{
-    --bg:#0f172a; --card:#111827; --ink:#e5e7eb; --muted:#cbd5e1;
-    --brand:#60a5fa; --brand-700:#3b82f6; --soft:#0b1222;
-    --good:#083b15; --bad:#3b0909; --ring: rgba(96,165,250,0.45);
-    --border:#1f2a37; --chip:#0b1222;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--ink);margin:0;display:flex;justify-content:center;align-items:flex-start;padding:20px}
-  a{color:var(--brand)}
-  .flex-container{display:flex;gap:30px;max-width:1800px;width:100%;align-items:flex-start}
-  .stack{display:flex;flex-direction:column;gap:12px}
-  .calculator,.sidebar{background:var(--card);padding:24px;border-radius:16px;box-shadow:0 15px 30px rgba(0,0,0,0.10)}
-  .calculator{width:640px;position:relative}
-  .calc-header{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:12px}
-  .hsd-logo{height:34px;width:auto;display:block;object-fit:contain}
-  h2{margin:0;font-size:26px;color:var(--brand)}
-  label{display:block;margin-bottom:6px;font-weight:600;color:var(--muted)}
-  input,select,textarea,button{font-family:'Poppins',sans-serif;font-size:16px}
-  input,select,textarea{width:100%;padding:12px;border:1px solid var(--border);background:transparent;color:var(--ink);border-radius:10px;margin-bottom:14px;outline:none}
-  input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
-  .button-group{display:flex;gap:10px;margin:10px 0;flex-wrap:wrap}
-  button{padding:12px 14px;border:none;border-radius:10px;background:var(--brand);color:#fff;cursor:pointer;font-weight:600;transition:.25s transform,.25s background}
-  button:hover{background:var(--brand-700);transform:translateY(-1px)}
-  button.secondary{background:#94a3b8;color:#0b1020}
-  button.ghost{background:transparent;border:1px solid var(--border);color:var(--ink)}
-  .msg{font-size:14px;line-height:1.3}
-  .msg.error{color:#b91c1c}.msg.ok{color:#065f46}
-  .result-card{margin-top:10px;padding:16px;border-radius:12px;background:var(--soft);font-size:18px;font-weight:600}
-  .original-offer{background:var(--chip);color:var(--brand);padding:8px;border-radius:8px;margin-bottom:6px}
-  .adjusted-offer{padding:8px;border-radius:8px;font-weight:700}
-  .adjusted-green{background:var(--good)}.adjusted-red{background:var(--bad)}
-  .renovation-section{margin-top:14px}
-  .renovation-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-  .renovation-options label{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer}
-  .renovation-options input[type="checkbox"]{width:18px;height:18px;accent-color:var(--brand)}
-  .sidebar{flex:1;display:flex;flex-direction:column;max-height:900px;position:sticky;top:20px;min-width:520px}
-  .sidebar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;position:relative}
-  .sidebar-brand{display:flex;align-items:center;gap:10px}
-  .sidebar-logo{height:28px;width:auto;display:block}
-  .sidebar-header::after{content:"";display:block;position:absolute;left:0;right:0;height:1px;background:var(--border);bottom:-8px;opacity:.6}
-  .export-btn{background:transparent;border:none;cursor:pointer;font-size:16px;color:var(--brand);opacity:0.8;transition:.2s;padding:6px;border-radius:8px}
-  .export-btn:hover{opacity:1;transform:scale(1.06);background:var(--soft)}
-  .tab-buttons{display:flex;gap:8px;background:var(--chip);border-radius:12px;padding:6px;flex-wrap:wrap}
-  .tab-buttons button{flex:1;border-radius:10px;margin:0;background:transparent;color:var(--ink);min-width:140px}
-  .tab-buttons button.active{background:var(--brand);color:#fff}
-  .tab-content{flex:1;overflow:auto;padding:12px;border:1px dashed var(--border);border-radius:12px;margin-top:10px}
-  .tab-section{display:none}
-  .saved-entry{padding:10px;margin-bottom:10px;background:var(--chip);border-radius:10px;font-size:14px;position:relative;cursor:pointer;word-wrap:break-word}
-  .saved-entry button{position:absolute;top:6px;padding:4px 8px;font-size:12px;border-radius:6px}
-  .saved-entry .del-btn{background:#ef4444;color:#fff;right:6px}
-  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.35);z-index:2000;opacity:.98}
-  #themeToggle{position:fixed;top:20px;right:20px;font-size:14px;width:36px;height:36px;border-radius:50%;display:flex;justify-content:center;align-items:center;background:var(--soft);border:1px solid var(--border);cursor:pointer;transition:.25s;z-index:3500}
-  #themeToggle:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
-  @media (max-width: 1100px){.flex-container{flex-direction:column;align-items:stretch}.calculator{width:100%}.sidebar{min-width:unset}}
-</style>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HSD Offer Calculator</title>
+  <title>HSD Offer Calculator — Templates & Saved</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root{
-      --bg:#eaf2ff; --card:#ffffff; --ink:#1f2937; --muted:#475569;
-      --brand:#1a73e8; --brand-700:#155bb5; --ring: rgba(26,115,232,0.28);
-      --soft:#f5f9ff; --border:#d0d8e5; --chip:#e8f0fe; --good:#eafff3; --bad:#ffecec;
+      --bg:#dcefff; --card:#ffffff; --ink:#222; --muted:#333;
+      --brand:#1a73e8; --brand-700:#155bb5; --soft:#f5f9ff;
+      --good:#e6ffed; --bad:#ffe6e6; --ring: rgba(26,115,232,0.35);
+      --border:#cbd5e1; --chip:#e6f0fa;
+    }
+    [data-theme="dark"]{
+      --bg:#0f172a; --card:#111827; --ink:#e5e7eb; --muted:#cbd5e1;
+      --brand:#60a5fa; --brand-700:#3b82f6; --soft:#0b1222;
+      --good:#083b15; --bad:#3b0909; --ring: rgba(96,165,250,0.45);
+      --border:#1f2a37; --chip:#0b1222;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0; background:var(--bg); color:var(--ink); font-family:'Poppins',sans-serif; display:flex; justify-content:center; align-items:flex-start; padding:24px}
-    .wrap{display:grid; grid-template-columns: 680px minmax(420px, 1fr); gap:28px; width:100%; max-width:1600px}
-    .card{background:var(--card); border-radius:16px; box-shadow:0 12px 30px rgba(16,24,40,.08); padding:22px}
-    .calc-header{display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:10px}
-    .logo{height:36px; width:auto; display:block}
-    h1{font-size:24px; color:var(--brand); margin:0}
-    label{display:block; margin:10px 0 6px; font-weight:600; color:var(--muted)}
-    input,select,button{
-      font-family:inherit; font-size:16px;
-    }
-    input,select{
-      width:100%; padding:12px 12px; border:1px solid var(--border);
-      background:#fff; color:inherit; border-radius:10px; outline:none;
-    }
-    input:focus,select:focus{border-color:var(--brand); box-shadow:0 0 0 4px var(--ring)}
-    .row{display:flex; gap:12px; flex-wrap:wrap}
-    .btn{padding:12px 14px; border:none; border-radius:10px; background:var(--brand); color:#fff; font-weight:600; cursor:pointer; transition:.22s}
-    .btn:hover{background:var(--brand-700); transform:translateY(-1px)}
-    .btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--border)}
-    .btn.secondary{background:#94a3b8; color:#0b1020}
-    .hint{font-size:13px; opacity:.8}
-    .msg{font-size:14px; margin-top:6px}
-    .msg.ok{color:#0a7a43}
-    .msg.error{color:#b91c1c}
-    .section-title{font-weight:700; color:var(--brand); margin:4px 0 8px}
-    .result{margin-top:12px; padding:16px; background:var(--soft); border-radius:12px; font-weight:600}
-    .pill{display:inline-block; padding:6px 10px; border-radius:999px; font-size:14px}
-    .pill.base{background:var(--chip); color:var(--brand)}
+    body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--ink);margin:0;display:flex;justify-content:center;align-items:flex-start;padding:20px}
+    a{color:var(--brand)}
+    .flex-container{display:flex;gap:30px;max-width:1800px;width:100%;align-items:flex-start}
+    .stack{display:flex;flex-direction:column;gap:12px}
+    .calculator,.sidebar{background:var(--card);padding:24px;border-radius:16px;box-shadow:0 15px 30px rgba(0,0,0,0.10)}
+    .calculator{width:640px;position:relative}
+    .calc-header{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:12px}
+    .hsd-logo{height:34px;width:auto;display:block;object-fit:contain}
+    h2{margin:0;font-size:26px;color:var(--brand)}
+    label{display:block;margin-bottom:6px;font-weight:600;color:var(--muted)}
+    input,select,textarea,button{font-family:'Poppins',sans-serif;font-size:16px}
+    input,select,textarea{width:100%;padding:12px;border:1px solid var(--border);background:transparent;color:var(--ink);border-radius:10px;margin-bottom:14px;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
+    .button-group{display:flex;gap:10px;margin:10px 0;flex-wrap:wrap}
+    button{padding:12px 14px;border:none;border-radius:10px;background:var(--brand);color:#fff;cursor:pointer;font-weight:600;transition:.25s transform,.25s background}
+    button:hover{background:var(--brand-700);transform:translateY(-1px)}
+    button.secondary{background:#94a3b8;color:#0b1020}
+    button.ghost{background:transparent;border:1px solid var(--border);color:var(--ink)}
+    .msg{font-size:14px;line-height:1.3}
+    .msg.error{color:#b91c1c}.msg.ok{color:#065f46}
+    .result-card{margin-top:10px;padding:16px;border-radius:12px;background:var(--soft);font-size:18px;font-weight:600}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;font-size:14px}
+    .pill.base{background:var(--chip);color:var(--brand)}
     .pill.adj.good{background:var(--good)}
     .pill.adj.bad{background:var(--bad)}
-    .renov-block{margin-top:10px}
-    .renov-options{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px}
-    .renov-options label{display:flex; align-items:center; gap:8px; font-weight:400}
-    .toast{position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#111827; color:#fff; padding:10px 14px; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.35); z-index:9999}
-    .list{display:grid; gap:10px}
-    .item{background:var(--chip); border-radius:12px; padding:10px; position:relative}
-    .badge{border:1px solid var(--border); border-radius:6px; padding:2px 6px; font-size:12px}
-    .del{position:absolute; top:8px; right:8px}
-    .toolbar{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px}
-    @media (max-width: 1100px){ .wrap{grid-template-columns: 1fr} }
+    .renovation-section{margin-top:14px}
+    .renovation-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+    .renovation-options label{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer}
+    .renovation-options input[type="checkbox"]{width:18px;height:18px;accent-color:var(--brand)}
+    .sidebar{flex:1;display:flex;flex-direction:column;max-height:900px;position:sticky;top:20px;min-width:520px}
+    .sidebar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;position:relative}
+    .sidebar-brand{display:flex;align-items:center;gap:10px}
+    .sidebar-logo{height:28px;width:auto;display:block}
+    .sidebar-header::after{content:"";display:block;position:absolute;left:0;right:0;height:1px;background:var(--border);bottom:-8px;opacity:.6}
+    .export-btn{background:transparent;border:none;cursor:pointer;font-size:16px;color:var(--brand);opacity:0.8;transition:.2s;padding:6px;border-radius:8px}
+    .export-btn:hover{opacity:1;transform:scale(1.06);background:var(--soft)}
+    .list{display:grid;gap:10px}
+    .item{background:var(--chip);border-radius:12px;padding:10px;position:relative}
+    .badge{border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:12px}
+    .del{position:absolute;top:8px;right:8px}
+    .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+    @media (max-width: 1100px){.flex-container{flex-direction:column;align-items:stretch}.calculator{width:100%}.sidebar{min-width:unset}}
   </style>
-  <!-- Supabase client (external, allowed by CSP) -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Our app code (external, so CSP-safe). Ensure this file exists in project root or /public. -->
   <script defer src="/app.js"></script>
 </head>
 <body>
-<button id="themeToggle" aria-label="Toggle dark mode">🌙</button>
-<div class="flex-container">
-  <!-- Calculator -->
-  <div class="calculator">
-    <div class="calc-header">
-      <img class="hsd-logo" src="/hsd-logo.png" alt="HSD Logo" />
-      <h2>HSD Offer Calculator</h2>
-    </div>
-    <!-- Auth -->
-    <div id="authBox" class="stack" style="margin:12px 0">
-      <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
-      <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
-      <div class="button-group">
-        <button id="signupBtn" class="ghost" type="button">Create account</button>
-        <button id="signinBtn" type="button">Sign in</button>
-        <button id="logoutBtn" type="button" class="ghost">Sign out</button>
-  <div class="wrap">
-    <!-- CALCULATOR -->
-    <section class="card" id="calcCard">
+  <div class="flex-container">
+    <!-- Calculator -->
+    <div class="calculator">
       <div class="calc-header">
-        <img class="logo" src="/hsd-logo.png" alt="HSD Logo" />
-        <h1>HSD Offer Calculator</h1>
+        <img class="hsd-logo" src="/hsd-logo.png" alt="HSD Logo" />
+        <h2>HSD Offer Calculator</h2>
       </div>
-      <div id="authMsg" class="msg" aria-live="polite"></div>
-      <small id="whoami" style="opacity:.8">Not signed in</small>
-    </div>
 
-    <!-- Inputs -->
-    <label for="customerName">Customer Name</label>
-    <input type="text" id="customerName" placeholder="Enter customer name" autofocus aria-label="Customer name">
-    <label for="listedPrice">Listed Price (£)</label>
-    <input type="text" id="listedPrice" inputmode="numeric" placeholder="e.g. 245,000" aria-label="Listed price">
-    <div class="stack">
-      <div>
-        <label for="daysToSell">Timeframe</label>
-        <select id="daysToSell" aria-label="Timeframe to sell">
-          <option value="7">7 Days</option>
-          <option value="30">30 Days</option>
-          <option value="90">90 Days</option>
-          <option value="180">Expectations</option>
-        </select>
       <!-- Auth -->
-      <div id="auth">
-        <div class="row">
+      <div class="stack" id="auth">
+        <div class="stack">
           <input type="email" id="email" placeholder="Email" autocomplete="username" />
           <input type="password" id="password" placeholder="Password" autocomplete="current-password" />
         </div>
-        <div class="row" style="margin-top:8px">
-          <button class="btn ghost" id="signup">Create account</button>
-          <button class="btn" id="signin">Sign in</button>
-          <button class="btn ghost" id="signout">Sign out</button>
+        <div class="button-group">
+          <button class="ghost" id="signup" type="button">Create account</button>
+          <button id="signin" type="button">Sign in</button>
+          <button class="ghost" id="signout" type="button">Sign out</button>
         </div>
         <div class="hint" id="who">Not signed in</div>
-        <div class="msg" id="authMsg"></div>
+        <div class="msg" id="authMsg" aria-live="polite"></div>
       </div>
-    </div>
 
-    <!-- Renovations FIRST (optional) -->
-    <div class="renovation-section" id="renovationSection">
-      <label>Include Renovation Costs?</label>
-      <div class="stack" role="radiogroup" aria-label="Include renovations">
-        <label><input type="radio" name="includeRenov" value="yes"> Yes</label>
-        <label><input type="radio" name="includeRenov" value="no" checked> No</label>
-      </div>
-      <div id="propertyTypeGroup" style="display:none; margin-top:8px">
-        <label for="propertyType">Property Type</label>
-        <select id="propertyType" aria-label="Property type">
-          <option value="">Select property type</option>
-          <option value="2 bed flat">2 Bed Flat</option>
-          <option value="2 bed terrace">2 Bed Terrace</option>
-          <option value="3 bed semi">3 Bed Semi</option>
-          <option value="4 bed detached">4 Bed Detached</option>
-          <option value="4 bed townhouse">4 Bed Townhouse</option>
-          <option value="3 bed end terrace">3 Bed End Terrace</option>
-          <option value="3 bed bungalow">3 Bed Bungalow</option>
-        </select>
       <!-- Inputs -->
       <label for="customer">Customer Name</label>
       <input id="customer" type="text" placeholder="e.g. Sarah Smith" />
+
       <label for="price">Listed Price (£)</label>
       <input id="price" type="text" inputmode="numeric" placeholder="e.g. 245,000" />
-      <div class="row">
-        <div style="flex:1 1 220px">
-          <label for="days">Timeframe</label>
-          <select id="days">
-            <option value="7">7 Days</option>
-            <option value="30">30 Days</option>
-            <option value="90">90 Days</option>
-            <option value="180">Expectation</option>
-          </select>
-        </div>
-      </div>
-      <div class="renovation-options" id="renovationOptions" style="display:none"></div>
-    </div>
-    <div class="button-group">
-      <button id="calculateBtn" type="button">Calculate Offer</button>
-      <button id="clearBtn" type="button" class="secondary">Clear</button>
-    </div>
 
-    <div class="result-card" id="result" aria-live="polite"></div>
+      <label for="days">Timeframe</label>
+      <select id="days" aria-label="Timeframe">
+        <option value="7">7 Days</option>
+        <option value="30">30 Days</option>
+        <option value="90">90 Days</option>
+        <option value="180">Expectations</option>
+      </select>
+
       <!-- Renovations -->
-      <div class="renov-block">
-        <div class="section-title">Renovations (optional)</div>
-        <div class="row" role="radiogroup">
+      <div class="renovation-section">
+        <label>Include Renovation Costs?</label>
+        <div class="stack" role="radiogroup" aria-label="Include renovations">
           <label><input type="radio" name="reno" value="no" checked> No</label>
           <label><input type="radio" name="reno" value="yes"> Yes</label>
         </div>
 
-    <div class="button-group">
-      <button id="saveBtn" type="button">Save Calculation</button>
-      <small id="saveStatus" class="msg" aria-live="polite" style="margin-left:6px"></small>
-    </div>
-  </div>
         <div id="renoTypeWrap" style="display:none; margin-top:8px">
           <label for="ptype">Property Type</label>
           <select id="ptype">
@@ -639,357 +126,38 @@ Original file line number	Diff line number	Diff line change
             <option value="3 bed bungalow">3 Bed Bungalow</option>
           </select>
         </div>
-
-  <!-- Sidebar -->
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-brand">
-        <img src="/hsd-logo.png" alt="House Sales Direct" class="sidebar-logo" />
-        <h2>Templates & Saved Data</h2>
-        <div class="renov-options" id="renoOptions" style="display:none"></div>
+        <div class="renovation-options" id="renoOptions" style="display:none"></div>
       </div>
-      <button id="exportBtn" class="export-btn" title="Export Backup">💾</button>
-    </div>
-    <div class="tab-buttons" role="tablist">
-      <button class="tab-btn active" data-tab="calculations" role="tab" aria-selected="true">Saved Calculations</button>
-      <button class="tab-btn" data-tab="emails" role="tab">Email Templates</button>
-      <button class="tab-btn" data-tab="sms" role="tab">SMS Templates</button>
-      <button class="tab-btn" data-tab="objections" role="tab">Objections</button>
+
+      <div class="button-group">
+        <button id="calc" type="button">Calculate</button>
+        <button id="clear" type="button" class="secondary">Clear</button>
+      </div>
+
+      <div class="result-card" id="result" aria-live="polite"></div>
+
+      <div class="button-group" style="margin-top:10px">
+        <button id="save" type="button">Save Calculation</button>
+        <div class="msg" id="saveMsg" aria-live="polite"></div>
+      </div>
     </div>
 
-    <div class="tab-content">
-      <div id="calculations" class="tab-section" style="display:block;">
-        <div class="stack">
-          <input type="text" id="searchCalc" placeholder="Search by customer name">
-          <small style="opacity:.7">Tip: sign in to sync across devices</small>
-          <button id="clearAllCalc" class="ghost">Clear Saved</button>
+    <!-- Sidebar (Saved Calculations) -->
+    <section class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <img src="/hsd-logo.png" alt="House Sales Direct" class="sidebar-logo" />
+          <h2>Saved Calculations</h2>
         </div>
-        <div id="savedCalcList" class="stack" style="margin-top:10px"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="btn" id="calc">Calculate</button>
-        <button class="btn secondary" id="clear">Clear</button>
       </div>
-
-      <div id="emails" class="tab-section">
-        <div class="stack">
-          <input type="text" id="newEmailTitle" placeholder="Template Name">
-          <textarea id="newEmailContent" placeholder="Email content" rows="5"></textarea>
-          <button id="saveEmail">Save Email</button>
-          <input type="text" id="searchEmail" placeholder="Search Emails">
-          <button id="clearAllEmails" class="ghost">Clear Emails</button>
-        </div>
-        <div id="emailList" class="stack" style="margin-top:10px"></div>
-      </div>
-      <div class="result" id="result"></div>
-
-      <div id="sms" class="tab-section">
-        <div class="stack">
-          <input type="text" id="newSMSTitle" placeholder="Template Name">
-          <textarea id="newSMSContent" placeholder="SMS content" rows="3"></textarea>
-          <button id="saveSMS">Save SMS</button>
-          <input type="text" id="searchSMS" placeholder="Search SMS Templates">
-          <button id="clearAllSMS" class="ghost">Clear SMS</button>
-        </div>
-        <div id="smsList" class="stack" style="margin-top:10px"></div>
-      <div class="row" style="margin-top:10px; align-items:center">
-        <button class="btn" id="save">Save Calculation</button>
-        <div class="msg" id="saveMsg"></div>
-      </div>
-      <div id="objections" class="tab-section">
-        <div class="stack">
-          <input type="text" id="newObjTitle" placeholder="Objection Title">
-          <textarea id="newObjContent" placeholder="Objection Script" rows="5"></textarea>
-          <button id="saveObj">Save Objection</button>
-          <input type="text" id="searchObj" placeholder="Search Objections">
-    </section>
-    <!-- SAVED LIST -->
-    <section class="card">
       <div class="toolbar">
-        <strong>Saved Calculations</strong>
-        <div class="row">
-          <input id="search" type="text" placeholder="Search by customer name" />
-          <button class="btn ghost" id="clearAll">Clear Saved</button>
-        </div>
-        <div id="objList" class="stack" style="margin-top:10px"></div>
+        <input id="search" type="text" placeholder="Search by customer name" />
+        <button class="ghost" id="clearAll">Clear Saved</button>
       </div>
-    </div>
       <div class="list" id="list"></div>
     </section>
   </div>
-</div>
-<!-- Supabase client -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-(function(){
-  // ===== Theme =====
-  const THEME_KEY='hsd_theme', themeToggle=document.getElementById('themeToggle');
-  const setTheme=(m)=>{document.documentElement.setAttribute('data-theme',m);localStorage.setItem(THEME_KEY,m);themeToggle.textContent=m==='dark'?'☀️':'🌙';};
-  setTheme(localStorage.getItem(THEME_KEY)|| (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
-  themeToggle.addEventListener('click', ()=> setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'));
-  // ===== Tiny UI helpers =====
-  const $=s=>document.querySelector(s);
-  const $$=s=>Array.from(document.querySelectorAll(s));
-  const toast=(m)=>{const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);};
-  const msg=(el, text, kind)=>{ if(!el) return; el.textContent=text||''; el.className='msg' + (kind?' '+kind:''); };
-  const debounce=(fn, d)=>{ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a),d);} };
-  // ===== Supabase init (make sure these match your project) =====
-  const SUPABASE_URL="https://jctioxawzpslmztsstpe.supabase.co";
-  const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false }});
-  // ===== Auth UI =====
-  const whoami=$('#whoami'), authMsg=$('#authMsg'), email=$('#authEmail'), password=$('#authPassword');
-  async function currentUser(){ const {data:{user}}=await supabase.auth.getUser(); return user; }
-  async function refreshWho(){ const u=await currentUser(); whoami.textContent = u ? `Signed in as ${u.email}` : 'Not signed in'; msg(authMsg,'',''); }
-  $('#signupBtn').addEventListener('click', async ()=>{
-    if(!email.value||!password.value) return msg(authMsg,'Enter email & password','error');
-    try{ await supabase.auth.signUp({email:email.value,password:password.value}); msg(authMsg,'Account created. You can sign in now.','ok'); toast('Account created'); }
-    catch(e){ msg(authMsg,e.message||'Sign-up failed','error'); }
-  });
-  $('#signinBtn').addEventListener('click', async ()=>{
-    if(!email.value||!password.value) return msg(authMsg,'Enter email & password','error');
-    try{
-      await supabase.auth.signInWithPassword({email:email.value,password:password.value});
-      const {data:{session}} = await supabase.auth.getSession();
-      if(!session) throw new Error('Signed in, but no session returned');
-      await refreshWho(); toast('Signed in'); window.syncCalcsFromCloud && window.syncCalcsFromCloud();
-    }catch(e){
-      const m=(e?.message||'').toLowerCase();
-      if(m.includes('invalid') || m.includes('email or password')) msg(authMsg,'Wrong email or password','error');
-      else msg(authMsg,e.message||'Sign-in failed','error');
-    }
-  });
-  $('#logoutBtn').addEventListener('click', async ()=>{
-    try{ await supabase.auth.signOut(); toast('Signed out'); setTimeout(()=>location.reload(),200); }
-    catch(e){ msg(authMsg,e?.message||'Sign-out failed','error'); }
-  });
-  supabase.auth.onAuthStateChange(async ()=>{ await refreshWho(); window.syncCalcsFromCloud && window.syncCalcsFromCloud(); });
-  refreshWho();
-  // ===== Calculator =====
-  const priceInput=$('#listedPrice'), daysSelect=$('#daysToSell'), resultDiv=$('#result');
-  const includeYesNo = $$('input[name="includeRenov"]');
-  const propertyTypeGroup=$('#propertyTypeGroup'), propertyTypeSelect=$('#propertyType'), renovationOptionsDiv=$('#renovationOptions');
-  const renoCosts={
-    "2 bed flat":{Kitchen:5000,Bathroom:1500,Redecoration:1000,Roof:null,Rewire:1500,Windows:1000,Boiler:1000,Garden:null},
-    "2 bed terrace":{Kitchen:5000,Bathroom:1500,Redecoration:850,Roof:2500,Rewire:1500,Windows:1000,Boiler:1000,Garden:500},
-    "3 bed semi":{Kitchen:4000,Bathroom:3500,Redecoration:1050,Roof:2500,Rewire:2500,Windows:1000,Boiler:1000,Garden:1500},
-    "4 bed detached":{Kitchen:4000,Bathroom:3500,Redecoration:1050,Roof:2500,Rewire:2500,Windows:1000,Boiler:1000,Garden:1500},
-    "4 bed townhouse":{Kitchen:4000,Bathroom:3500,Redecoration:1050,Roof:2500,Rewire:2500,Windows:1000,Boiler:1000,Garden:1500},
-    "3 bed end terrace":{Kitchen:4000,Bathroom:3500,Redecoration:1050,Roof:2500,Rewire:2500,Windows:1000,Boiler:1000,Garden:1500},
-    "3 bed bungalow":{Kitchen:4000,Bathroom:3500,Redecoration:1050,Roof:2500,Rewire:2500,Windows:1000,Boiler:1000,Garden:1500}
-  };
-  function fmtMoneyInput(el){ if(!el) return; el.addEventListener('input', function(){ let v=this.value.replace(/,/g,''); if(v && !isNaN(v)) this.value=parseInt(v,10).toLocaleString(); else if(v==='') this.value=''; }); }
-  fmtMoneyInput(priceInput);
-  const spread = (p)=> p<=149999?5000 : p<=249999?10000 : p<=349999?15000 : p<=449999?20000 : 25000;
-  const round1k = n => Math.round(n/1000)*1000;
-  let currentOffers=null;
-  function populateRenovations(){
-    const t = propertyTypeSelect.value; renovationOptionsDiv.innerHTML='';
-    if(!t) return;
-    const costs=renoCosts[t];
-    Object.keys(costs).forEach(item=>{
-      const c=costs[item], disabled=c===null?'disabled':'', label=c===null?`${item} (N/A)`:`${item} (£${c.toLocaleString()})`;
-      const row=document.createElement('label'); row.innerHTML=`<input type="checkbox" value="${item}" ${disabled}> ${label}`;
-      renovationOptionsDiv.appendChild(row);
-    });
-  }
-  document.getElementById('renovationSection').addEventListener('change', (e)=>{
-    if(e.target.name==='includeRenov'){
-      const include=e.target.value==='yes';
-      propertyTypeGroup.style.display = include ? 'block' : 'none';
-      renovationOptionsDiv.style.display='none';
-      if(!include){ propertyTypeSelect.value=''; renovationOptionsDiv.innerHTML=''; }
-      calculateOffer();
-    }
-  });
-  propertyTypeSelect.addEventListener('change', ()=>{
-    if(propertyTypeSelect.value){ populateRenovations(); renovationOptionsDiv.style.display='grid'; }
-    else{ renovationOptionsDiv.style.display='none'; renovationOptionsDiv.innerHTML=''; }
-    calculateOffer();
-  });
-function calculateOffer(){
-  const raw = priceInput.value.replace(/,/g,'');
-  const listed = parseFloat(raw);
-  if (isNaN(listed)) { resultDiv.textContent='Enter a valid listed price.'; currentOffers=null; return; }
 
-  const d = parseInt(daysSelect.value,10);
-  let baseBottom, baseTop;
-
-  // ✅ Expectations logic (180): Top = listed; Bottom = listed - required spread
-  if (d === 180) {
-    baseTop = listed;
-    baseBottom = listed - spread(listed);
-  }
-  else if (d === 90) { baseBottom = listed*0.90; baseTop = baseBottom + spread(listed); }
-  else if (d === 30) { baseBottom = listed*0.80; baseTop = baseBottom + spread(listed); }
-  else {               baseBottom = listed*0.70; baseTop = baseBottom + spread(listed); }
-
-  let bottom = round1k(baseBottom), top = round1k(baseTop);
-  if (bottom<0) bottom=0; if (top<0) top=0;
-
-  const include = (document.querySelector('input[name="includeRenov"]:checked')?.value==='yes');
-  let selected = [], total = 0;
-  if (include && propertyTypeSelect.value) {
-    selected = [...renovationOptionsDiv.querySelectorAll('input:checked')].map(cb => cb.value);
-    selected.forEach(i => { total += renoCosts[propertyTypeSelect.value][i] || 0; });
-  }
-
-  const adjBottom = Math.max(0, round1k(bottom - total));
-  const adjTop = Math.max(0, round1k(top - total));
-  currentOffers = { bottom, top, adjBottom, adjTop, renovations: selected };
-
-  const cls = adjBottom >= bottom ? 'adjusted-green' : 'adjusted-red';
-  resultDiv.innerHTML = `
-    <div class="original-offer">Original Offer: £${bottom.toLocaleString()} - £${top.toLocaleString()}</div>
-    ${ total>0 ? `<div>Renovation Costs: £${total.toLocaleString()}</div>` : '' }
-    <div class="adjusted-offer ${cls}">Adjusted Offer: £${adjBottom.toLocaleString()} - £${adjTop.toLocaleString()}</div>
-  `;
-}
-
-  $('#calculateBtn').addEventListener('click', calculateOffer);
-  priceInput.addEventListener('input', debounce(calculateOffer,120));
-  daysSelect.addEventListener('change', calculateOffer);
-  setTimeout(calculateOffer,0);
-  // ===== Save (cloud + local fallback) =====
-  const Storage={ get:k=>JSON.parse(localStorage.getItem(k)||'[]'), set:(k,v)=>localStorage.setItem(k,JSON.stringify(v)) };
-  const savedCalcList=$('#savedCalcList'), searchCalc=$('#searchCalc'), clearAllCalc=$('#clearAllCalc');
-  const customerInput=$('#customerName'), saveStatus=$('#saveStatus');
-  let savedCalculations=[];
-  async function saveToCloud(entry){
-    const {data:{user}} = await supabase.auth.getUser();
-    if(!user) throw new Error('Not signed in');
-    const {error} = await supabase.from('calculations').insert({ user_id:user.id, data:entry });
-    if(error) throw error;
-  }
-  function renderSavedCalc(){
-    const q=(searchCalc.value||'').toLowerCase(); savedCalcList.innerHTML='';
-    savedCalculations.forEach((e,i)=>{
-      if((e.name||'').toLowerCase().includes(q)){
-        const div=document.createElement('div'); div.className='saved-entry';
-        const badge=e.id?'Cloud':'Local';
-        div.innerHTML=`
-          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-            <div><strong>${e.name}</strong> ${e.propertyType?(' | '+e.propertyType):''}</div>
-            <small style="opacity:.7;border:1px solid var(--border);padding:2px 6px;border-radius:6px">${badge}</small>
-          </div>
-          <div style="background:#d0e5ff;padding:6px;border-radius:8px;margin-top:6px">
-            Original: £${e.originalOffer.bottom.toLocaleString()} - £${e.originalOffer.top.toLocaleString()}
-          </div>
-          <div style="background:${e.adjustedOffer.bottom>=e.originalOffer.bottom?'var(--good)':'var(--bad)'};padding:6px;border-radius:8px;margin-top:6px">
-            Adjusted: £${e.adjustedOffer.bottom.toLocaleString()} - £${e.adjustedOffer.top.toLocaleString()}
-          </div>
-          <small style="opacity:.8;display:block;margin-top:6px">${new Date(e.timestamp).toLocaleString?.()||e.timestamp}</small>
-          <button class="del-btn">Del</button>
-        `;
-        div.querySelector('.del-btn').addEventListener('click', async (ev)=>{
-          ev.stopPropagation();
-          if(!confirm('Delete this saved calculation?')) return;
-          const row=savedCalculations[i];
-          try{
-            if(row.id){ await supabase.from('calculations').delete().eq('id', row.id); await syncCalcsFromCloud(); toast('Deleted from cloud'); }
-            else { savedCalculations.splice(i,1); Storage.set('hsdSaved', savedCalculations); renderSavedCalc(); toast('Deleted locally'); }
-          }catch(err){ toast('Delete failed'); console.error(err); }
-        });
-        savedCalcList.appendChild(div);
-      }
-    });
-  }
-  async function syncCalcsFromCloud(){
-    try{
-      const {data:{user}}=await supabase.auth.getUser();
-      if(user){
-        const {data, error}=await supabase.from('calculations').select('id, data, created_at').order('created_at',{ascending:false});
-        if(error) throw error;
-        savedCalculations=(data||[]).map(r=>({ ...r.data, id:r.id, created_at:r.created_at }));
-      }else{
-        savedCalculations=Storage.get('hsdSaved')||[];
-      }
-      renderSavedCalc();
-    }catch(e){
-      console.error(e); toast('Could not sync from cloud');
-      savedCalculations=Storage.get('hsdSaved')||[]; renderSavedCalc();
-    }
-  }
-  window.syncCalcsFromCloud=syncCalcsFromCloud;
-  syncCalcsFromCloud();
-  $('#saveBtn').addEventListener('click', async ()=>{
-    if(!customerInput.value.trim()) return toast('Enter customer name first');
-    if(!currentOffers) return toast('Calculate offer first');
-    const include = (document.querySelector('input[name="includeRenov"]:checked')?.value==='yes');
-    const entry={
-      name:customerInput.value.trim(),
-      listedPrice: $('#listedPrice').value,
-      timeframe: $('#daysToSell').value,
-      includeRenov: include,
-      propertyType: include ? ($('#propertyType').value||'') : '',
-      renovations: currentOffers.renovations||[],
-      originalOffer:{bottom:currentOffers.bottom, top:currentOffers.top},
-      adjustedOffer:{bottom:currentOffers.adjBottom, top:currentOffers.adjTop},
-      timestamp:new Date().toISOString()
-    };
-    try{
-      await saveToCloud(entry);
-      msg(saveStatus,'Saved to cloud','ok'); toast('Saved to cloud'); await syncCalcsFromCloud();
-    }catch(e){
-      msg(saveStatus, `Cloud save failed — saved locally`, 'error');
-      const local=Storage.get('hsdSaved')||[]; local.unshift(entry); Storage.set('hsdSaved', local);
-      savedCalculations=local; renderSavedCalc();
-      console.error(e);
-    }
-  });
-  searchCalc.addEventListener('input', debounce(renderSavedCalc,160));
-  $('#clearAllCalc').addEventListener('click', ()=>{
-    if(!savedCalculations.length) return toast('Nothing to clear');
-    if(!confirm('Clear ALL saved calculations?')) return;
-    savedCalculations=[]; Storage.set('hsdSaved', savedCalculations); renderSavedCalc(); toast('All calculations cleared');
-  });
-  // Tabs
-  const tabBtns=$$('.tab-btn'), tabSections=$$('.tab-section');
-  tabBtns.forEach(btn=>btn.addEventListener('click', ()=>{
-    tabBtns.forEach(b=>b.classList.remove('active')); btn.classList.add('active');
-    tabSections.forEach(sec=>sec.style.display='none'); document.getElementById(btn.dataset.tab).style.display='block';
-  }));
-  // Templates simple local stores
-  function setupList(storageKey, titleId, contentId, listId, saveBtnId, searchId, clearId){
-    let items=Storage.get(storageKey);
-    const t=$('#'+titleId), c=$('#'+contentId), list=$('#'+listId), save=$('#'+saveBtnId), search=$('#'+searchId), clear=$('#'+clearId);
-    function render(){
-      const q=(search.value||'').toLowerCase(); list.innerHTML='';
-      items.forEach((e,i)=>{
-        if((e.title||'').toLowerCase().includes(q)){
-          const div=document.createElement('div'); div.className='saved-entry';
-          div.innerHTML = `${e.title}<button class="del-btn">Del</button>`;
-          div.addEventListener('click',()=>{ navigator.clipboard.writeText(e.content||''); toast('Copied'); });
-          div.querySelector('.del-btn').addEventListener('click',(ev)=>{ ev.stopPropagation(); if(!confirm('Delete this item?')) return; items.splice(i,1); Storage.set(storageKey,items); render(); toast('Deleted'); });
-          list.appendChild(div);
-        }
-      });
-    }
-    save.addEventListener('click',()=>{ if(!t.value.trim()||!c.value.trim()) return toast('Enter title & content'); items.unshift({title:t.value.trim(), content:c.value.trim()}); Storage.set(storageKey,items); t.value=''; c.value=''; render(); toast('Saved'); });
-    search.addEventListener('input', debounce(render,160));
-    clear.addEventListener('click', ()=>{ if(!items.length) return toast('Nothing to clear'); if(!confirm('Clear all?')) return; items=[]; Storage.set(storageKey,items); render(); toast('Cleared'); });
-    render();
-  }
-  setupList('emails','newEmailTitle','newEmailContent','emailList','saveEmail','searchEmail','clearAllEmails');
-  setupList('smsTemplates','newSMSTitle','newSMSContent','smsList','saveSMS','searchSMS','clearAllSMS');
-  (function(){ // objections
-    let items=Storage.get('objections');
-    const title=$('#newObjTitle'), content=$('#newObjContent'), list=$('#objList'), save=$('#saveObj'), search=$('#searchObj');
-    function render(){ const q=(search.value||'').toLowerCase(); list.innerHTML=''; items.forEach((e,i)=>{ if(!q || (e.title||'').toLowerCase().includes(q)){ const div=document.createElement('div'); div.className='saved-entry'; div.innerHTML=`${e.title}<button class="del-btn">Del</button>`; div.addEventListener('click',()=>{ navigator.clipboard.writeText(e.content||''); toast('Copied'); }); div.querySelector('.del-btn').addEventListener('click',(ev)=>{ ev.stopPropagation(); if(!confirm('Delete this item?')) return; items.splice(i,1); Storage.set('objections',items); render(); toast('Deleted'); }); list.appendChild(div);} }); }
-    save.addEventListener('click',()=>{ if(!title.value.trim()||!content.value.trim()) return toast('Enter title & content'); items.unshift({title:title.value.trim(), content:content.value.trim()}); Storage.set('objections',items); title.value=''; content.value=''; render(); toast('Saved'); });
-    search.addEventListener('input', debounce(render,160)); render();
-  })();
-
-})();
-</script>
   <div id="toast" class="toast" style="display:none"></div>
 </body>
 </html>
-0 commit comments
-Comments
-0
- (0)
-Comment
-You're not receiving notifications from this thread.
-
-Add files via upload · Kizzzaaa/hsd-offer-calculator@4354352
-1 file remains
