@@ -47,6 +47,7 @@
     button:hover{background:var(--brand-700);transform:translateY(-1px)}
     button.secondary{background:#94a3b8;color:#0b1020}
     button.ghost{background:transparent;border:1px solid var(--border);color:var(--ink)}
+    button:disabled{opacity:.55;cursor:not-allowed;transform:none}
     .msg{font-size:14px;line-height:1.3}
     .msg.error{color:#b91c1c}.msg.ok{color:#065f46}
     .result-card{margin-top:10px;padding:16px;border-radius:12px;background:var(--soft);font-size:18px;font-weight:600}
@@ -86,11 +87,11 @@
     }
   </style>
 
-  <!-- Load Supabase BEFORE your app -->
+  <!-- Supabase must load BEFORE your app -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
 
   <!-- Your app code (cache-busted to ensure the latest JS loads) -->
-  <script defer src="/app.js?v=12"></script>
+  <script defer src="/app.js?v=13"></script>
 </head>
 <body>
   <div class="flex-container">
@@ -114,9 +115,10 @@
           <button id="signin" type="button">Sign in</button>
           <button class="ghost" id="signout" type="button">Sign out</button>
         </div>
-        <div class="hint" id="who">Not signed in</div>
-        <div class="msg" id="authMsg" aria-live="polite"></div>
-        <!-- Debug session label (updated by app.js heartbeat) -->
+
+        <!-- Live auth status + messages -->
+        <div class="hint" id="who" role="status" aria-live="polite">Not signed in</div>
+        <div class="msg" id="authMsg" role="status" aria-live="polite"></div>
         <div id="authDebug" class="msg" style="opacity:.7"></div>
       </div>
 
@@ -167,7 +169,8 @@
       <div class="result-card" id="result" aria-live="polite"></div>
 
       <div class="button-group" style="margin-top:10px">
-        <button id="save" type="button">Save Calculation</button>
+        <!-- Disabled by default; JS enables on sign-in -->
+        <button id="save" type="button" disabled>Save Calculation</button>
         <div class="msg" id="saveMsg" aria-live="polite"></div>
       </div>
     </div>
@@ -194,7 +197,7 @@
             <input id="search" type="text" placeholder="Search by customer name" />
             <button class="ghost" id="clearAll" type="button">Clear Saved</button>
           </div>
-          <div class="list" id="list"></div>
+          <div class="list" id="list" aria-live="polite"></div>
         </div>
 
         <div id="emails" class="tab-section" role="tabpanel" aria-labelledby="emails">
