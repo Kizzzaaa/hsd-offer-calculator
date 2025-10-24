@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HSD Offer Calculator — Templates & Saved</title>
 
@@ -83,10 +86,18 @@
     }
   </style>
 
-  <!-- Load Supabase BEFORE your app to guarantee availability -->
+  <!-- Load Supabase BEFORE your app -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
-  <!-- Your app code (the fixed JS you pasted earlier) -->
-  <script defer src="/app.js"></script>
+
+  <!-- Tiny watchdog (optional) -->
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (!window.supabase) console.error('Supabase SDK missing');
+    });
+  </script>
+
+  <!-- Your app code (cache-busted) -->
+  <script defer src="/app.js?v=10"></script>
 </head>
 <body>
   <div class="flex-container">
@@ -112,6 +123,8 @@
         </div>
         <div class="hint" id="who">Not signed in</div>
         <div class="msg" id="authMsg" aria-live="polite"></div>
+        <!-- Debug session label (you can remove later) -->
+        <div id="authDebug" class="msg" style="opacity:.7"></div>
       </div>
 
       <!-- Inputs -->
