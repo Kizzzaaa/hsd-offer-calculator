@@ -86,18 +86,50 @@
     }
   </style>
 
-  <!-- Load Supabase BEFORE your app -->
+  <!-- Supabase must load BEFORE your app -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
 
-  <!-- Tiny watchdog (optional) -->
+  <!-- Minimal watchdog + session debug that doesn't depend on app.js -->
   <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      if (!window.supabase) console.error('Supabase SDK missing');
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (!window.supabase || !window.supabase.createClient) {
+        console.error('Supabase SDK missing');
+        return;
+      }
+      // Mirror your app config (must match app.js)
+      const SUPABASE_URL = "https://jctioxawzpslmztsstpe.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjdGlveGF3enBzbG16dHNzdHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNzI4MzYsImV4cCI6MjA3NTk0ODgzNn0.USUXW5UATduMmkBDbLQ2Ll9D8a_UhTjU8knl5bJ0-Cs";
+      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+      });
+
+      async function paintSession() {
+        try {
+          const { data } = await client.auth.getSession();
+          const u = data?.session?.user || null;
+          const who = document.getElementById('who');
+          const dbg = document.getElementById('authDebug');
+          if (who) who.textContent = u ? `Signed in as ${u.email}` : 'Not signed in';
+          if (dbg) dbg.textContent = u ? `session: ${u.email}` : 'session: null';
+        } catch (e) {
+          console.warn('paintSession error', e);
+        }
+      }
+
+      // Paint once on load
+      paintSession();
+
+      // Keep in sync with any auth changes (even before app.js runs)
+      client.auth.onAuthStateChange(async () => {
+        paintSession();
+      });
+      // Expose just for quick console checks
+      window.__sb_watchdog = client;
     });
   </script>
 
-  <!-- Your app code (cache-busted) -->
-  <script defer src="/app.js?v=10"></script>
+  <!-- Your app code (cache-busted so the newest JS is used) -->
+  <script defer src="/app.js?v=11"></script>
 </head>
 <body>
   <div class="flex-container">
@@ -123,7 +155,7 @@
         </div>
         <div class="hint" id="who">Not signed in</div>
         <div class="msg" id="authMsg" aria-live="polite"></div>
-        <!-- Debug session label (you can remove later) -->
+        <!-- Debug session label -->
         <div id="authDebug" class="msg" style="opacity:.7"></div>
       </div>
 
@@ -196,7 +228,6 @@
       </div>
 
       <div class="tab-content">
-        <!-- Saved Calculations -->
         <div id="calculations" class="tab-section" style="display:block;" role="tabpanel" aria-labelledby="calculations">
           <div class="toolbar">
             <input id="search" type="text" placeholder="Search by customer name" />
@@ -205,7 +236,6 @@
           <div class="list" id="list"></div>
         </div>
 
-        <!-- Emails -->
         <div id="emails" class="tab-section" role="tabpanel" aria-labelledby="emails">
           <div class="stack">
             <input type="text" id="newEmailTitle" placeholder="Template Name">
@@ -217,7 +247,6 @@
           <div id="emailList" class="stack" style="margin-top:10px"></div>
         </div>
 
-        <!-- SMS -->
         <div id="sms" class="tab-section" role="tabpanel" aria-labelledby="sms">
           <div class="stack">
             <input type="text" id="newSMSTitle" placeholder="Template Name">
@@ -229,7 +258,6 @@
           <div id="smsList" class="stack" style="margin-top:10px"></div>
         </div>
 
-        <!-- Objections -->
         <div id="objections" class="tab-section" role="tabpanel" aria-labelledby="objections">
           <div class="stack">
             <input type="text" id="newObjTitle" placeholder="Objection Title">
